@@ -1,5 +1,15 @@
-# Week 1 dependencies (verified on CPython 3.14.6, Windows x64)
+# GeneWeaver dependencies (verified on CPython 3.14.6, Windows x64)
 biopython==1.88
 numpy==2.5.4
 textual==8.2.8
 pytest==8.3.3
+# Distributed CPU processing (installed: dask 2024.12.1, distributed 2024.12.1)
+dask==2024.12.1
+distributed==2024.12.1
+# Optional GPU backend: install numba on machines where its native DLLs are
+# NOT blocked by Application Control / WDAC policy. On the development
+# machine `import numba` fails ("Application Control policy has blocked
+# this file"), so GPU execution is unavailable there. No nvcc required —
+# numba JIT-compiles CUDA via LLVM/NVVM. See `python -m geneware.cli gpu-status`.
+# numba==0.68.1
+# Alternative GPU backend (unverified on py3.14): pip install cupy-cuda12x

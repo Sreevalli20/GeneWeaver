@@ -1,420 +1,230 @@
-# 🧬 GeneWeaver
-### GPU-Accelerated CRISPR Alignment Engine
+# GeneWeaver — GPU-Accelerated CRISPR Alignment Engine
 
-**Domain:** Bioinformatics & High-Performance Computing (HPC)  
-**Project:** Infotact Solutions – Advanced Python Engineering (Second Month)  
-**Repository:** GeneWeaver
+GeneWeaver is a Python application for CRISPR guide-RNA off-target style
+protospacer search. It parses real FASTA genomes, scans both DNA strands
+for guide matches with configurable PAM and mismatch tolerance, ranks
+hits with an experimental scoring model, and can execute on CPU, GPU
+(Numba CUDA, when the environment permits), or a Dask-distributed CPU
+cluster — with real measured benchmarks and exportable reports.
 
----
+> **Honesty note:** the off-target *score* is an internally designed
+> heuristic for ranking candidates. It is **not** a medically validated
+> biological prediction. GPU metrics are only ever displayed when a GPU
+> backend genuinely executes; otherwise the app reports GPU as
+> unavailable with the exact requirements.
 
-## 📌 Project Overview
+## Environment audit
 
-GeneWeaver is a Python-based, GPU-accelerated genomic sequence analysis engine designed to identify potential CRISPR off-target sites in DNA sequences.
+* **Python:** 3.14.6 (`C:\Python314\python.exe`) — verified, unchanged.
+* **GPU:** NVIDIA GeForce RTX 5050 Laptop (8 GB), driver 592.82,
+  CUDA runtime 13.1 per `nvidia-smi`. `nvcc` is **not** installed —
+  and none is needed for the numba backend (it JIT-compiles via
+  LLVM/NVVM).
+* **GPU status on this machine:** **unavailable**. numba 0.68.1 (the
+  first release with cp314 wheels) installs, but Windows Application
+  Control / WDAC blocks its native `_helperlib` DLL at import
+  (`ImportError: DLL load failed ... Application Control policy has
+  blocked this file`) — the same policy that blocks BioPython's
+  `Bio.Align._codonaligner`. `cupy` is not installed. The GPU code path
+  is fully implemented and activates automatically on any machine where
+  numba (or cupy) can actually run; run
+  `python -m geneware.cli gpu-status` to probe.
 
-In CRISPR gene editing, guide RNA directs the Cas9 system towards a specific DNA target. However, similar sequences at other genomic locations can potentially cause unintended off-target interactions.
+### Dependency compatibility (Python 3.14.6, Windows x64)
 
-GeneWeaver aims to address this challenge by providing a computational pipeline that processes genomic FASTA files, compares target sequences against reference DNA, identifies potential off-target matches, and ranks candidate locations based on sequence similarity and biological scoring criteria.
+| Package      | Status | Notes |
+|--------------|--------|-------|
+| biopython    | 1.88   | `Bio.SeqIO` needs the documented AlignIO shim (WDAC blocks `Bio.Align._codonaligner`); FASTA parsing unaffected |
+| numpy        | 2.5.4  | upgraded from 1.26.4 (no cp314 wheel) |
+| textual      | 8.2.8  | terminal dashboard |
+| dask         | 2024.12.1 | distributed CPU chunk processing |
+| distributed  | 2024.12.1 | LocalCluster backend |
+| numba        | 0.68.1 installed, **blocked by WDAC** | GPU path present but cannot execute here |
+| cupy         | not installed | optional alternative GPU backend |
+| pytest       | 8.3.3  | test runner |
 
-The system combines Python-based bioinformatics processing, NVIDIA GPU acceleration, distributed task scheduling, and a real-time terminal dashboard.
+## Project layout
 
-## 🎯 Project Objectives
-
-- Develop an efficient genomic FASTA processing pipeline.
-- Implement DNA sequence alignment and mismatch detection.
-- Accelerate suitable sequence-comparison workloads using NVIDIA CUDA.
-- Use parallel processing to handle large genomic datasets.
-- Identify and rank potential CRISPR off-target candidates.
-- Monitor processing progress and system resources through a live terminal dashboard.
-- Benchmark CPU and GPU performance.
-- Produce structured and reproducible analysis reports.
-
-## 🧠 Problem Statement
-
-Searching large genomic sequences for unintended CRISPR off-target matches can require significant computational resources.
-
-Traditional sequential Python implementations may become inefficient when processing large datasets.
-
-GeneWeaver explores high-performance Python techniques to improve genomic sequence analysis through:
-
-- GPU parallel computation.
-- Efficient memory management.
-- Genome chunking.
-- Distributed task scheduling.
-- Optimized sequence alignment algorithms.
-
-The goal is to create a scalable computational screening engine that makes genomic sequence analysis more efficient.
-
-## 🏗️ System Architecture
-
-```text
-                 GENOME INPUT
-                      |
-                      v
-              FASTA FILE UPLOAD
-                      |
-                      v
-              GENOMIC PARSER
-                 BioPython
-                      |
-                      v
-             SEQUENCE VALIDATION
-                      |
-                      v
-               GENOME CHUNKING
-                      |
-                      v
-             PROCESSING SCHEDULER
-                    Dask
-                      |
-             +--------+--------+
-             |                 |
-             v                 v
-        CPU BASELINE       GPU ENGINE
-                           Numba CUDA
-             |                 |
-             +--------+--------+
-                      |
-                      v
-              SEQUENCE ALIGNMENT
-                      |
-                      v
-              OFF-TARGET DETECTION
-                      |
-                      v
-               BIOLOGICAL SCORING
-                      |
-                      v
-              RESULTS & REPORTING
-                      |
-                      v
-             TEXTUAL LIVE DASHBOARD
+```
+geneware/
+  __init__.py      package marker + version
+  __main__.py      `python -m geneware` entry point
+  fasta.py         FASTA parsing + validation + statistics (BioPython)
+  chunking.py      memory-conscious genome chunker with coordinates
+  aligner.py       CPU protospacer/PAM scanner (IUPAC-aware, both strands)
+  scoring.py       experimental off-target ranking score (heuristic-v1)
+  gpu.py           GPU detection (numba.cuda / cupy) + CUDA kernel path
+  dask_engine.py   Dask-distributed chunk processing + worker status
+  pipeline.py      unified backend dispatcher + timed benchmarks
+  benchmark.py     real timing/throughput/memory measurements
+  reports.py       CSV / JSON / HTML report export
+  app.py           Textual dashboard — 10 functional tabs
+  cli.py           argparse CLI (parse/scan/bench/analyze/report/gpu-status)
+tests/             pytest suite (82 tests)
+data/example.fasta small synthetic demo genome (test fixture)
+requirements.txt   pinned dependencies (+ optional GPU notes)
+pytest.ini         pytest-asyncio configuration
 ```
 
-## ⚙️ Technology Stack
+## Implemented functionality
 
-| Technology | Purpose |
-|---|---|
-| Python 3.14.6 | Core application development |
-| BioPython | FASTA parsing and biological sequence processing |
-| Numba | JIT compilation and GPU acceleration |
-| CUDA | Parallel computation on NVIDIA GPUs |
-| Dask | Parallel and distributed task scheduling |
-| Textual | Interactive terminal user interface |
-| NumPy | Numerical and array-based computation |
-| pytest | Testing and validation |
-| Git & GitHub | Version control and collaboration |
+### Genome file management (`fasta.py`, Genome tab)
+* BioPython `SeqIO` streaming parser; multi-record FASTA support.
+* Record IDs, descriptions, lengths, per-record and aggregate GC%,
+  base counts, ambiguous-base counts — all real measurements.
+* IUPAC DNA validation; invalid characters raise `FastaParseError`
+  (never silently dropped); uracil normalised to thymine with warning.
+* Lazy per-record iteration for large files; clear error messages.
 
-**Compatibility note:** Dependency versions and GPU support will be verified against Python 3.14.6 before implementation. Unsupported packages will not be silently treated as compatible.
+### CRISPR off-target analysis (`aligner.py`, `pipeline.py`)
+* Guide validation (IUPAC alphabet, length bounds, U→T).
+* Both-strand search: `+` direct, `-` via reverse complement.
+* IUPAC-aware base compatibility; configurable PAM patterns
+  (default `NGG`, Cas9 geometry, PAM-proximal to protospacer).
+* Configurable max mismatches; mismatch positions recorded.
+* 0-based half-open `[start, end)` coordinates on the plus strand.
+* Chunk-overlap deduplication (key: chr/start/end/strand).
 
-## 🔬 Core Modules
+### Biological scoring (`scoring.py`, Scoring tab)
+* Experimental heuristic `geneware-heuristic-v1`, clearly labelled as
+  **not** a validated biological prediction:
+  `score = 100 − 10·mismatches − 5·(mismatches in last 8 protospacer
+  positions) − 15·(PAM incompatible)`, clamped to [0, 100].
+* Seed-region (PAM-proximal) mismatches cost extra. Full formula shown
+  in the UI and every exported report.
 
-### 1. Genomic Parser
+### GPU acceleration (`gpu.py`)
+* Real detection probe: `numba.cuda` first, `cupy` second; reports
+  device name, VRAM, compute capability when present.
+* Real CUDA implementation via `@cuda.jit` kernels (one thread per
+  window start, per strand) with device buffers, plus CPU-side
+  IUPAC/PAM verification of every GPU hit before reporting.
+* `scan_with_fallback` returns a truthful `'gpu'`/`'cpu'` backend tag.
+* On this machine GPU is **unavailable** (WDAC blocks numba DLLs);
+  the UI and `gpu-status` say so explicitly with requirements.
 
-Responsible for reading and preparing genomic data.
+### Dask processing (`dask_engine.py`, Dask tab)
+* Genome split into `GenomeChunk`s; each chunk is an independent task
+  submitted to a `distributed.LocalCluster` (processes or threads).
+* `as_completed` progress tracking; per-task error capture (failed
+  workers are counted and listed, never faked).
+* Results merged with the same `deduplicate` as sequential scan.
+* `dask_status()` reports real worker/thread/memory measurements.
+* Backend honestly reported as `dask-processes`, `dask-threads`, or
+  `dask-external`. No distributed-GPU claims.
 
-Planned capabilities:
+### Dashboard (`app.py`) — 10 tabs, every control functional
+1. **Home** — live status (genome/GPU/Dask/last analysis), quick start.
+2. **Genome** — load FASTA or example, record table, real stats.
+3. **Analyzer** — guide, PAM, strand, max mismatches, require-PAM,
+   backend select, workers, progress bar, analyze.
+4. **Results** — sortable DataTable (click headers), score-ranked,
+   min-score/chromosome/strand filters, quick CSV/JSON/HTML export.
+5. **Scoring** — formula explanation + last-run score summary.
+6. **Performance** — benchmark runner for cpu/gpu/dask backends.
+7. **Dask** — real scheduler status + one-click Dask analysis.
+8. **Benchmarks** — comparison table of every recorded run.
+9. **Reports** — write CSV/JSON/HTML/bundle to the configured dir.
+10. **Settings** — chunk size, overlap, workers, processes, out dir.
 
-- FASTA file ingestion.
-- DNA sequence validation.
-- Sequence normalization.
-- Chromosome identification.
-- Genome chunking.
-- Sequence statistics.
-- Input error handling.
+### Benchmarking (`benchmark.py`, `pipeline.py`)
+* `perf_counter_ns` timing split parse/align/total; `tracemalloc` peak
+  Python memory (reported `n/a` when unavailable); bases/s and
+  windows/s throughput; backend recorded in notes.
+* CPU-vs-GPU comparison only appears when both backends actually ran —
+  never fabricated.
 
-### 2. CUDA Kernel Engine
+### Reports (`reports.py`)
+* CSV (ranked candidates), JSON (full settings + stats + candidates),
+  self-contained HTML (inline CSS, no external assets). Every report
+  embeds guide, PAM, mismatch threshold, strands, backend, timings.
 
-Responsible for accelerating genomic sequence comparisons.
+## Installation
 
-Planned capabilities:
-
-- CPU-based alignment baseline.
-- CUDA kernel implementation using Numba.
-- Parallel sequence comparisons.
-- GPU memory allocation and management.
-- Host-to-device and device-to-host transfers.
-- CPU versus GPU benchmarking.
-- GPU memory monitoring.
-
-### 3. Distributed Scheduler
-
-Responsible for coordinating genome-processing workloads.
-
-Planned capabilities:
-
-- Genome chunk distribution.
-- Dask task scheduling.
-- Parallel worker execution.
-- Processing progress tracking.
-- Result aggregation.
-- Worker error handling.
-- Scalable execution where hardware is available.
-
-### 4. Live Terminal Dashboard
-
-Built using Textual.
-
-Planned dashboard sections:
-
-- Genome input information.
-- Sequence-processing status.
-- Current processing progress.
-- CPU and GPU execution statistics.
-- GPU memory information.
-- Chunk-processing status.
-- Potential off-target candidates.
-- Mismatch information.
-- Alignment results.
-- Final analysis summary.
-
-## 🧬 CRISPR Off-Target Analysis
-
-The analysis pipeline is designed to:
-
-1. Accept a reference genome in FASTA format.
-2. Accept a CRISPR guide sequence.
-3. Configure the target PAM pattern.
-4. Search for matching genomic regions.
-5. Identify sequence mismatches.
-6. Evaluate candidate locations.
-7. Rank potential off-target sites.
-8. Generate a structured analysis report.
-
-The scoring system will consider sequence mismatches and PAM compatibility.
-
-Results represent computationally identified candidates and do not establish actual biological editing activity or clinical safety.
-
-## 📅 Four-Week Development Roadmap
-
-### Week 1 – Genome Processing Foundation
-
-- Implement a CPU-based DNA sequence alignment baseline.
-- Build the genomic parser using BioPython.
-- Read and process FASTA files.
-- Divide genome sequences into manageable chunks.
-- Establish baseline execution-time measurements.
-
-### Week 2 – GPU Acceleration & Dashboard
-
-- Implement CUDA kernels using Numba.
-- Handle CPU and GPU memory transfers.
-- Develop GPU-based sequence comparisons.
-- Build the initial Textual dashboard.
-- Display genome-processing progress.
-- Monitor GPU memory usage.
-
-### Mid-Project Review
-
-- Benchmark GPU implementation against CPU baseline.
-- Evaluate memory consumption.
-- Validate genome-processing functionality.
-- Test large genomic datasets.
-- Evaluate the assignment's 100x GPU speedup target.
-
-### Week 3 – Distributed Processing & Biological Scoring
-
-- Integrate Dask for distributed processing.
-- Implement parallel genome-chunk scheduling.
-- Develop off-target candidate scoring.
-- Evaluate PAM sequence compatibility.
-- Rank potential off-target matches.
-- Improve processing and result aggregation.
-
-### Week 4 – Optimization & Finalization
-
-- Explore CUDA shared-memory optimization.
-- Improve processing performance.
-- Refine the Textual dashboard.
-- Highlight DNA mismatches.
-- Improve error handling and validation.
-- Complete testing and documentation.
-- Prepare final analysis reports.
-
-## 📊 Performance Evaluation
-
-GeneWeaver will evaluate performance through measurable benchmarks.
-
-| Metric | Purpose |
-|---|---|
-| CPU execution time | Establish baseline performance |
-| GPU execution time | Measure accelerated processing |
-| Speedup ratio | Compare CPU and GPU execution |
-| Genome processing rate | Measure bases processed per second |
-| GPU memory consumption | Monitor device memory usage |
-| Processing throughput | Evaluate chunk-processing performance |
-| Alignment accuracy | Validate sequence-comparison results |
-
-Speedup will be calculated as:
-
-```text
-Speedup = CPU Execution Time / GPU Execution Time
+```bat
+cd C:\Users\Sreevalli\Downloads\geneware
+python -m pip install -r requirements.txt
 ```
 
-Performance measurements will be recorded from actual executions. No benchmark values or acceleration claims will be reported without testing.
+## Usage
 
-## 💻 Hardware Requirements
+### Terminal dashboard
 
-- 64-bit operating system.
-- Python 3.14.6 development environment.
-- NVIDIA GPU with CUDA-compatible hardware and drivers for GPU execution.
-- Sufficient system RAM for the selected genome dataset.
-- NVIDIA GPU memory appropriate for the workload.
-
-CPU-based analysis and other supported functionality should remain available when CUDA hardware is unavailable.
-
-## 🚀 Installation & Setup
-
-Clone the repository:
-
-```bash
-git clone https://github.com/Sreevalli20/GeneWeaver.git
+```bat
+python -m geneware
 ```
 
-Navigate into the project:
+Workflow: **Genome** tab → Load Genome (or Load Example) → **Analyzer**
+tab → enter guide, PAM, mismatches, backend → **Analyze** → review in
+**Results** → export in **Reports**.
 
-```bash
-cd GeneWeaver
+### CLI
+
+```bat
+python -m geneware.cli parse data\example.fasta
+python -m geneware.cli scan data\example.fasta --guide CCCCggggnnnnAAAACCCC
+python -m geneware.cli analyze data\example.fasta --guide CCCCggggnnnnAAAACCCC --backend cpu
+python -m geneware.cli analyze data\example.fasta --guide CCCCggggnnnnAAAACCCC --backend dask --threads
+python -m geneware.cli bench data\example.fasta --guide CCCCggggnnnnAAAACCCC
+python -m geneware.cli report data\example.fasta --guide CCCCggggnnnnAAAACCCC --out-dir reports
+python -m geneware.cli gpu-status
 ```
 
-Create a virtual environment using Python 3.14:
+Common options: `--chunk-size`, `--overlap`, `--pam`, `--strand`,
+`--max-mismatches`, `--allow-pam-mismatch`, `--backend cpu|gpu|dask`,
+`--workers`, `--threads`, `--json`.
 
-```bash
-py -3.14 -m venv .venv
+## Testing
+
+```bat
+python -m pytest tests -q
 ```
 
-Activate it on Windows:
+82 tests cover: FASTA parsing edge cases, chunk boundaries, both
+strands, PAM matching, mismatch positions, deduplication, scoring
+formula/ranking, GPU detection contract + fallback, Dask scan equality
+with sequential results, report generation, pipeline backends, and
+Textual app smoke tests (tab mounting, genome load, full CPU analysis).
+GPU-execution tests skip automatically when no GPU backend is usable.
 
-```bash
-.venv\Scripts\activate
+## Coordinate & matching conventions
+
+* Coordinates: 0-based, half-open `[start, end)` on the plus strand of
+  each FASTA record (`record_id` = chromosome).
+* `-` strand candidates match the reverse complement of `[start, end)`.
+* PAM = 3 bases immediately 3' of the protospacer **on the candidate
+  strand**; edge windows that can't fit protospacer+PAM are skipped.
+* IUPAC-aware matching throughout; ambiguous bases preserved.
+
+## Known limitations
+
+* **GPU execution unavailable on this machine** — WDAC blocks numba's
+  native DLLs (and would likely block cupy/torch DLLs too). To enable:
+  install numba on a machine without the blocking policy
+  (`pip install numba`; no nvcc needed), or `pip install
+  cupy-cuda12x`. Then `gpu-status` reports the RTX 5050 and the GPU
+  backend runs automatically.
+* **Pure-Python CPU inner loop** — adequate for small/medium loci;
+  chromosome-scale scans will be slow (measured honestly by `bench`).
+  Numba CPU JIT (`@njit`, no CUDA needed) is a planned Week-3
+  optimisation that also requires unblocked DLLs.
+* Dask workers are CPU-only here; distributed GPU is not implemented.
+* `tracemalloc` measures Python allocations only; GPU VRAM metrics are
+  only reported when a GPU backend actually runs.
+* `Bio.AlignIO` and compiled BioPython modules unusable under WDAC
+  (shim covers FASTA needs).
+* Chunk overlap must be ≥ guide length + PAM length (default 64).
+
+## Enabling GPU on an unrestricted machine
+
+```bat
+pip install numba==0.68.1
+python -m geneware.cli gpu-status   # should report available: true
+python -m geneware.cli analyze genome.fasta --guide <guide> --backend gpu
 ```
 
-Install dependencies after verifying Python 3.14.6 compatibility:
-
-```bash
-python -m pip install --upgrade pip
-```
-
-Install the project dependencies using the finalized requirements file:
-
-```bash
-pip install -r requirements.txt
-```
-
-**Note:** GPU execution requires compatible NVIDIA drivers, CUDA support, and compatible Numba dependencies. CPU-only operation does not demonstrate CUDA acceleration.
-
-## ▶️ Running the Project
-
-The exact execution commands will be documented after the application entry points and modules are implemented.
-
-The intended workflow is:
-
-1. Launch GeneWeaver.
-2. Load a reference genome FASTA file.
-3. Enter a CRISPR guide sequence.
-4. Configure the PAM pattern and mismatch threshold.
-5. Start genomic analysis.
-6. Monitor processing through the live dashboard.
-7. Review potential off-target locations.
-8. Export the analysis report.
-
-## 🧪 Testing & Validation
-
-The project will include tests for:
-
-- FASTA parsing.
-- Invalid sequence handling.
-- Genome chunking.
-- DNA alignment correctness.
-- Mismatch detection.
-- PAM compatibility.
-- CPU/GPU result consistency.
-- Dask task execution.
-- Memory management.
-- Dashboard updates.
-- Error handling.
-
-## 📁 Planned Repository Structure
-
-```text
-GeneWeaver/
-│
-├── geneweaver/
-│   ├── __init__.py
-│   │
-│   ├── parser/
-│   │   ├── __init__.py
-│   │   ├── fasta_parser.py
-│   │   └── genome_chunker.py
-│   │
-│   ├── alignment/
-│   │   ├── __init__.py
-│   │   ├── cpu_engine.py
-│   │   ├── cuda_engine.py
-│   │   └── scoring.py
-│   │
-│   ├── scheduler/
-│   │   ├── __init__.py
-│   │   └── dask_scheduler.py
-│   │
-│   ├── dashboard/
-│   │   ├── __init__.py
-│   │   └── app.py
-│   │
-│   ├── reporting/
-│   │   ├── __init__.py
-│   │   └── report_generator.py
-│   │
-│   └── utils/
-│       ├── __init__.py
-│       └── validation.py
-│
-├── tests/
-│   ├── test_parser.py
-│   ├── test_alignment.py
-│   ├── test_scoring.py
-│   └── test_scheduler.py
-│
-├── data/
-│   └── sample/
-│
-├── benchmarks/
-│   └── benchmark.py
-│
-├── docs/
-│
-├── requirements.txt
-├── .gitignore
-├── README.md
-└── main.py
-```
-
-This is the planned structure and may evolve as development progresses.
-
-## 🔐 Data & Responsible Use
-
-- Use public reference genome datasets or synthetic DNA sequences for development and testing.
-- Do not upload private or identifiable human genomic data.
-- Keep large datasets outside GitHub.
-- Do not treat computational predictions as confirmed biological findings.
-- Preserve reproducibility through documented parameters and benchmark configurations.
-
-## 👩‍💻 Project Information
-
-**Project Name:** GeneWeaver  
-**Project Category:** Bioinformatics & High-Performance Computing  
-**Development Language:** Python  
-**Internship:** Infotact Solutions – Advanced Python Engineering  
-**Project Duration:** Second-Month Project
-
-**GitHub Repository:**  
-https://github.com/Sreevalli20/GeneWeaver
-
----
-
-## 🌟 Project Vision
-
-GeneWeaver aims to demonstrate how Python can be extended beyond traditional scripting through GPU acceleration, parallel computing, memory-efficient data processing, and biological sequence analysis.
-
-The ultimate objective is to develop a reliable, scalable, and performance-oriented CRISPR off-target screening engine using modern Python engineering techniques.
-
-**Built with Python. Accelerated with CUDA. Designed for genomic discovery.**
+The CUDA kernels use one thread per window start per strand, 2-bit base
+encoding, device-side mismatch counting, and CPU-side IUPAC/PAM
+verification of every hit. Ambiguous (non-ACGT) bases never match on
+the GPU path — a documented conservative difference from the CPU
+IUPAC-aware matcher.

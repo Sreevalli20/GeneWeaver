@@ -1,3 +1,3 @@
-"""GeneWeaver - GPU-accelerated CRISPR alignment engine (Week 1: CPU foundation)."""
+"""GeneWeaver - GPU-accelerated CRISPR alignment engine."""
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"

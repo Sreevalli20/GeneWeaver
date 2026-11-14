@@ -6,10 +6,14 @@ pytest==8.3.3
 # Distributed CPU processing (installed: dask 2024.12.1, distributed 2024.12.1)
 dask==2024.12.1
 distributed==2024.12.1
-# Optional GPU backend: install numba on machines where its native DLLs are
-# NOT blocked by Application Control / WDAC policy. On the development
-# machine `import numba` fails ("Application Control policy has blocked
-# this file"), so GPU execution is unavailable there. No nvcc required —
-# numba JIT-compiles CUDA via LLVM/NVVM. See `python -m geneware.cli gpu-status`.
-# numba==0.68.1
+# Optional-but-recommended GPU backend. Numba JIT-compiles CUDA via
+# LLVM/NVVM (no nvcc needed), but it still needs the CUDA *libraries*
+# (nvvm.dll, nvrtc, cudart, libdevice). The wheels below ship exactly
+# those DLLs; geneware auto-links them into a CUDA_HOME-layout dir under
+# the user cache (see geneware/gpu.py). Safe to install without a GPU.
+# A real CUDA toolkit / CUDA_HOME also works instead of these wheels.
+numba==0.68.1
+nvidia-cuda-nvcc-cu12==12.8.93   # provides nvvm.dll + libdevice
+nvidia-cuda-nvrtc-cu12==12.8.93  # provides nvrtc*.dll
+nvidia-cuda-runtime-cu12==12.8.90 # provides cudart*.dll
 # Alternative GPU backend (unverified on py3.14): pip install cupy-cuda12x

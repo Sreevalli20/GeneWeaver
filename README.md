@@ -1,46 +1,45 @@
 # GeneWeaver — GPU-Accelerated CRISPR Alignment Engine
 
-**Week 1 foundation: repository audit + CPU baseline.**
+GeneWeaver is a Python application for CRISPR guide-RNA off-target style
+protospacer search. It parses real FASTA genomes, scans both DNA strands
+for guide matches with configurable PAM and mismatch tolerance, ranks
+hits with an experimental scoring model, and can execute on CPU, GPU
+(Numba CUDA — verified on the RTX 5050 in this repo), or a
+Dask-distributed CPU cluster — with real measured benchmarks and
+exportable reports.
 
-GeneWeaver is an engineering project for Infotact Solutions: a Python
-application for CRISPR guide-RNA off-target style protospacer search,
-architected to move from a CPU baseline to GPU acceleration in later
-weeks. This repository currently implements the **Week 1 CPU-only
-foundation**. No GPU/CUDA code exists yet and none is claimed.
+> **Honesty note:** the off-target *score* is an internally designed
+> heuristic for ranking candidates. It is **not** a medically validated
+> biological prediction. GPU metrics are only ever displayed when a GPU
+> backend genuinely executes; otherwise the app reports GPU as
+> unavailable with the exact requirements.
 
-## Environment audit (Week 1)
+## Environment audit
 
-* **Python:** 3.14.6 (`C:\Python314\python.exe`) — verified.
-* **GPU:** NVIDIA GeForce RTX 5050 (8 GB), driver 592.82, CUDA runtime
-  13.1 reported by `nvidia-smi`. `nvcc` is **not** installed, so no CUDA
-  compilation is possible yet. GPU work is Week 2+.
-* **Pre-existing state:** the workspace was empty; this is a fresh
-  codebase, not a modification of prior work.
+* **Python:** 3.14.6 (`C:\Python314\python.exe`) — verified, unchanged.
+* **GPU:** NVIDIA GeForce RTX 5050 Laptop (8 GB), driver 592.82,
+  CUDA runtime 13.1 per `nvidia-smi`. Compute capability 12.0 (sm_120).
+* **GPU status on this machine:** **available**. numba 0.68.1
+  JIT-compiles CUDA via LLVM/NVVM (no `nvcc` needed). The CUDA *libraries*
+  (nvvm/nvrtc/cudart/libdevice) are not part of a toolkit install, so
+  geneware auto-links them from the `nvidia-cuda-*-cu12` pip wheels into
+  a CUDA_HOME-layout directory under the user cache before probing
+  (`geneware/gpu.py:_ensure_cuda_home`). `cupy` is not installed; the
+  numba backend is used. Run `python -m geneware.cli gpu-status` to probe.
 
-### Dependency compatibility findings
+### Dependency compatibility (Python 3.14.6, Windows x64)
 
-| Package   | Status on Python 3.14.6 | Notes |
-|-----------|------------------------|-------|
-| biopython | 1.88 installed | `Bio.SeqIO` import needs a shim — see below |
-| numpy     | **upgraded 1.26.4 → 2.5.4** | 1.26.4 has no cp314 wheel; its DLL is blocked/incompatible and `import numpy` fails. 2.5.4 has a cp314 wheel and works. |
-| numba     | not installed | No cp314-compatible release verified yet; deferred to Week 2 GPU work. |
-| CUDA      | driver present, no toolkit | `nvcc` absent; required before any CUDA kernel work. |
-| dask      | 2024.12.1 already installed | not used in Week 1 |
-| textual   | 8.2.8 installed | dashboard framework |
-| pytest    | 8.3.3 already installed | test runner |
-
-### Known environment limitation: Application Control policy
-
-Windows Application Control (WDAC/Smart App Control) on this machine
-blocks `Bio.Align._codonaligner`, a compiled BioPython extension, with
-*"DLL load failed … Application Control policy has blocked this file."*
-`Bio.SeqIO` eagerly imports `Bio.AlignIO`, which loads that DLL, so a
-plain `from Bio import SeqIO` fails. `geneware.fasta` contains a
-**documented shim**: if `Bio.AlignIO` cannot be imported, a stub module
-is registered so `Bio.SeqIO` loads for sequence formats only. FASTA
-parsing is unaffected; alignment-format IO through `Bio.AlignIO` is
-unavailable in this environment. This is an environment policy issue,
-not a code defect.
+| Package      | Status | Notes |
+|--------------|--------|-------|
+| biopython    | 1.88   | `Bio.SeqIO` needs the documented AlignIO shim (WDAC blocks `Bio.Align._codonaligner`); FASTA parsing unaffected |
+| numpy        | 2.5.4  | upgraded from 1.26.4 (no cp314 wheel) |
+| textual      | 8.2.8  | terminal dashboard |
+| dask         | 2024.12.1 | distributed CPU chunk processing |
+| distributed  | 2024.12.1 | LocalCluster backend |
+| numba        | 0.68.1 | GPU backend — works on this machine |
+| nvidia-cuda-nvcc-cu12 / -nvrtc-cu12 / -runtime-cu12 | 12.8.x | provide nvvm/nvrtc/cudart/libdevice DLLs for numba (auto-linked) |
+| cupy         | not installed | optional alternative GPU backend |
+| pytest       | 8.3.3  | test runner |
 
 ## Project layout
 
@@ -50,46 +49,106 @@ geneware/
   __main__.py      `python -m geneware` entry point
   fasta.py         FASTA parsing + validation + statistics (BioPython)
   chunking.py      memory-conscious genome chunker with coordinates
-  aligner.py       CPU protospacer/PAM baseline scanner
+  aligner.py       CPU protospacer/PAM scanner (IUPAC-aware, both strands)
+  scoring.py       experimental off-target ranking score (heuristic-v1)
+  gpu.py           GPU detection (numba.cuda / cupy) + CUDA kernel path
+  dask_engine.py   Dask-distributed chunk processing + worker status
+  pipeline.py      unified backend dispatcher + timed benchmarks
   benchmark.py     real timing/throughput/memory measurements
-  app.py           Textual terminal dashboard
-  cli.py           argparse CLI (parse / scan / bench)
-tests/             pytest suite (49 tests)
+  reports.py       CSV / JSON / HTML report export
+  app.py           Textual dashboard — 10 functional tabs
+  cli.py           argparse CLI (parse/scan/bench/analyze/report/gpu-status)
+tests/             pytest suite (85 tests)
 data/example.fasta small synthetic demo genome (test fixture)
-requirements.txt   pinned Week 1 dependencies
+requirements.txt   pinned dependencies (+ optional GPU notes)
+pytest.ini         pytest-asyncio configuration
 ```
 
-## Implemented functionality (Week 1)
+## Implemented functionality
 
-* **FASTA processing** (`geneware.fasta`): BioPython `SeqIO`-based
-  streaming parser; multi-record support; ID/description preservation;
-  IUPAC DNA validation; empty/malformed input errors; ambiguous-base
-  preservation; U→T normalisation with warning; per-base counts, GC%,
-  ambiguous count, record stats. Invalid characters are never silently
-  discarded — they raise `FastaParseError`.
-* **Genome chunking** (`geneware.chunking`): configurable chunk size and
-  overlap; absolute 0-based half-open coordinates preserved; chromosome
-  IDs carried through; short sequences handled; overlap sized so
-  boundary-spanning windows are found in full.
-* **CPU alignment baseline** (`geneware.aligner`): guide validation
-  (IUPAC alphabet, configurable length bounds); configurable IUPAC PAM
-  patterns (default `NGG`); forward and reverse-complement strand
-  search; exact-length window comparison with IUPAC-aware base
-  compatibility; mismatch positions recorded; chromosome/coordinate/
-  strand/PAM provenance on every candidate; configurable mismatch
-  threshold; candidate deduplication across chunk boundaries.
-  *This is a baseline scanner, not a validated off-target model.*
-* **Benchmarking** (`geneware.benchmark`): `time.perf_counter_ns()`
-  timing split into parse / align / total; bases processed; windows
-  evaluated; candidates; chunks; throughput (bases/s, windows/s);
-  peak Python memory via `tracemalloc` (reported as unavailable if the
-  facility cannot start). No numbers are fabricated.
-* **Textual dashboard** (`geneware.app`): branding header; genome load
-  with real validation stats; guide/PAM/strand/mismatch controls; scan
-  with live progress; results table; benchmark panel with measured
-  figures; log of errors and warnings. Every button performs its real
-  operation. No GPU metrics are displayed.
-* **CLI** (`geneware.cli`): `parse`, `scan`, `bench` subcommands.
+### Genome file management (`fasta.py`, Genome tab)
+* BioPython `SeqIO` streaming parser; multi-record FASTA support.
+* Record IDs, descriptions, lengths, per-record and aggregate GC%,
+  base counts, ambiguous-base counts — all real measurements.
+* IUPAC DNA validation; invalid characters raise `FastaParseError`
+  (never silently dropped); uracil normalised to thymine with warning.
+* Lazy per-record iteration for large files; clear error messages.
+
+### CRISPR off-target analysis (`aligner.py`, `pipeline.py`)
+* Guide validation (IUPAC alphabet, length bounds, U→T).
+* Both-strand search: `+` direct, `-` via reverse complement.
+* IUPAC-aware base compatibility; configurable PAM patterns
+  (default `NGG`, Cas9 geometry, PAM-proximal to protospacer).
+* Configurable max mismatches; mismatch positions recorded.
+* 0-based half-open `[start, end)` coordinates on the plus strand.
+* Chunk-overlap deduplication (key: chr/start/end/strand).
+
+### Biological scoring (`scoring.py`, Scoring tab)
+* Experimental heuristic `geneware-heuristic-v1`, clearly labelled as
+  **not** a validated biological prediction:
+  `score = 100 − 10·mismatches − 5·(mismatches in last 8 protospacer
+  positions) − 15·(PAM incompatible)`, clamped to [0, 100].
+* Seed-region (PAM-proximal) mismatches cost extra. Full formula shown
+  in the UI and every exported report.
+
+### GPU acceleration (`gpu.py`) — verified working on this laptop
+* Real detection probe: `numba.cuda` first, `cupy` second; reports
+  device name, VRAM (`cuda.mem_get_info`), and compute capability
+  (RTX 5050, CC 12.0) when present.
+* `_ensure_cuda_home()` auto-provisions the CUDA libraries numba needs
+  from the `nvidia-*-cu12` pip wheels (or respects a user-set
+  `CUDA_HOME`/`CUDA_PATH` / CUDA toolkit).
+* Real CUDA implementation via `@cuda.jit` kernels (one thread per
+  window start, per strand) with device buffers. Every GPU hit is
+  re-verified on CPU with the exact IUPAC/PAM semantics before being
+  reported, so coordinates, mismatch positions, and scores are always
+  consistent with the CPU path.
+* `scan_with_fallback` returns a truthful `'gpu'`/`'cpu'` backend tag.
+* **Conservative difference:** the kernels compare exact ACGT codes, so
+  windows containing ambiguous (IUPAC) bases can be filtered out even
+  when the CPU IUPAC-aware matcher would accept them. On pure-ACGT
+  sequence, GPU and CPU results are identical (verified by test).
+* On machines without numba/CUDA libraries the UI and `gpu-status`
+  report GPU as unavailable with the exact requirements.
+
+### Dask processing (`dask_engine.py`, Dask tab)
+* Genome split into `GenomeChunk`s; each chunk is an independent task
+  submitted to a `distributed.LocalCluster` (processes or threads).
+* `as_completed` progress tracking; per-task error capture (failed
+  workers are counted and listed, never faked).
+* Results merged with the same `deduplicate` as sequential scan.
+* `dask_status()` reports real worker/thread/memory measurements.
+* Backend honestly reported as `dask-processes`, `dask-threads`, or
+  `dask-external`. No distributed-GPU claims.
+
+### Dashboard (`app.py`) — 10 tabs, every control functional
+1. **Home** — live status (genome/GPU/Dask/last analysis), quick start.
+2. **Genome** — load FASTA or example, record table, real stats.
+3. **Analyzer** — guide, PAM, strand, max mismatches, require-PAM,
+   backend select, workers, progress bar, analyze.
+4. **Results** — metrics line (sequences, bases, windows, matches,
+   mismatches, backend, elapsed), sortable DataTable (click headers to
+   sort, click again to reverse), min-score/chromosome/strand/PAM/coordinate
+   search filters, quick CSV/JSON/HTML export, explicit empty-state
+   message when nothing matches.
+5. **Scoring** — formula explanation + last-run score summary.
+6. **Performance** — benchmark runner for cpu/gpu/dask backends.
+7. **Dask** — real scheduler status + one-click Dask analysis.
+8. **Benchmarks** — comparison table of every recorded run.
+9. **Reports** — write CSV/JSON/HTML/bundle to the configured dir.
+10. **Settings** — chunk size, overlap, workers, processes, out dir.
+
+### Benchmarking (`benchmark.py`, `pipeline.py`)
+* `perf_counter_ns` timing split parse/align/total; `tracemalloc` peak
+  Python memory (reported `n/a` when unavailable); bases/s and
+  windows/s throughput; backend recorded in notes.
+* CPU-vs-GPU comparison only appears when both backends actually ran —
+  never fabricated.
+
+### Reports (`reports.py`)
+* CSV (ranked candidates), JSON (full settings + stats + candidates),
+  self-contained HTML (inline CSS, no external assets). Every report
+  embeds guide, PAM, mismatch threshold, strands, backend, timings.
 
 ## Installation
 
@@ -98,33 +157,33 @@ cd C:\Users\Sreevalli\Downloads\geneware
 python -m pip install -r requirements.txt
 ```
 
-(Only needed on a fresh environment; packages are already installed.)
-
 ## Usage
 
 ### Terminal dashboard
 
 ```bat
 python -m geneware
-:: or
-python -m geneware.app
 ```
 
-Controls: enter a FASTA path (or *Load Example Genome*), set the guide,
-PAM patterns, strand, and max mismatches, then *Run Scan* / *Run
-Benchmark*.
+Workflow: **Genome** tab → Load Genome (or Load Example) → **Analyzer**
+tab → enter guide, PAM, mismatches, backend → **Analyze** → review in
+**Results** → export in **Reports**.
 
 ### CLI
 
 ```bat
 python -m geneware.cli parse data\example.fasta
-python -m geneware.cli scan data\example.fasta --guide ACGTACGTACGTACGTACGT --max-mismatches 2
-python -m geneware.cli bench data\example.fasta --guide ACGTACGTACGTACGTACGT
+python -m geneware.cli scan data\example.fasta --guide CCCCggggnnnnAAAACCCC
+python -m geneware.cli analyze data\example.fasta --guide CCCCggggnnnnAAAACCCC --backend cpu
+python -m geneware.cli analyze data\example.fasta --guide CCCCggggnnnnAAAACCCC --backend dask --threads
+python -m geneware.cli bench data\example.fasta --guide CCCCggggnnnnAAAACCCC
+python -m geneware.cli report data\example.fasta --guide CCCCggggnnnnAAAACCCC --out-dir reports
+python -m geneware.cli gpu-status
 ```
 
-Common scan options: `--chunk-size`, `--overlap`, `--pam` (comma-separated
-IUPAC patterns), `--strand both|+|-`, `--max-mismatches`,
-`--allow-pam-mismatch`.
+Common options: `--chunk-size`, `--overlap`, `--pam`, `--strand`,
+`--max-mismatches`, `--allow-pam-mismatch`, `--backend cpu|gpu|dask`,
+`--workers`, `--threads`, `--json`.
 
 ## Testing
 
@@ -132,44 +191,42 @@ IUPAC patterns), `--strand both|+|-`, `--max-mismatches`,
 python -m pytest tests -q
 ```
 
-49 tests cover: valid/multi-record/invalid/empty FASTA, ambiguous
-nucleotides, uracil normalisation, stats correctness, chunk boundaries
-and coordinate preservation, plus/minus-strand matching, mismatch
-counting, PAM compatibility, custom PAM patterns, chunk-overlap
-deduplication, and benchmark output sanity. All test sequences are
-small synthetic fixtures, not real genomic data.
+85 tests cover: FASTA parsing edge cases, chunk boundaries, both
+strands, PAM matching, mismatch positions, deduplication, scoring
+formula/ranking, GPU detection contract + CPU fallback + real GPU
+execution parity with CPU (skipped automatically when no GPU backend
+is usable), Dask scan equality with sequential results, report
+generation, pipeline backends, and Textual app smoke tests (tab
+mounting, genome load, full CPU analysis, results metrics, filtering
+empty state).
 
 ## Coordinate & matching conventions
 
-* Coordinates are **0-based, half-open `[start, end)`** on the plus
-  strand of each FASTA record (`record_id` = chromosome identifier).
-* A candidate's protospacer occupies `[start, end)`; for `-` strand
-  candidates the guide matches the **reverse complement** of that
-  window.
-* PAM is the 3 bases immediately 3' of the protospacer **on the
-  candidate strand** (Cas9 NGG geometry, no bulge).
-* Base comparison is IUPAC-aware: positions match when the IUPAC
-  expansion sets intersect.
-* Windows are only evaluated when protospacer + PAM fit entirely inside
-  the scanned chunk; edge windows that cannot be fully assessed are
-  skipped.
+* Coordinates: 0-based, half-open `[start, end)` on the plus strand of
+  each FASTA record (`record_id` = chromosome).
+* `-` strand candidates match the reverse complement of `[start, end)`.
+* PAM = 3 bases immediately 3' of the protospacer **on the candidate
+  strand**; edge windows that can't fit protospacer+PAM are skipped.
+* IUPAC-aware matching throughout; ambiguous bases preserved.
 
-## Known limitations (Week 1)
+## Known limitations
 
-* Pure-Python inner loop: throughput on chromosome-scale FASTA will be
-  modest (measured, not estimated — see `bench` output). Numba/CUDA
-  acceleration is planned for Week 2+.
-* `Bio.AlignIO` and other compiled BioPython modules are unusable under
-  this machine's Application Control policy (shim covers FASTA needs).
-* `tracemalloc` measures Python-level allocations only.
-* No GPU code, no CUDA kernels, no validated off-target scoring model.
-* Chunk overlap must be >= guide length + PAM length to guarantee
-  boundary coverage (default 64 covers up to 30-nt guides + 3-nt PAM).
-
-## Planned for Week 2
-
-* Numba/CUDA-accelerated seed-and-extend or k-mer indexing alignment.
-* NumPy-vectorised mismatch counting.
-* CUDA toolkit installation + first genuine GPU kernel with verified
-  execution before any GPU claims are made.
-* Larger real-world locus benchmarks.
+* **GPU vs CPU on ambiguous bases:** the CUDA kernels use exact ACGT
+  codes, so windows containing IUPAC ambiguity codes (N, R, ...) are
+  conservatively filtered even when the CPU IUPAC-aware matcher would
+  accept them. On unambiguous sequence the two backends return
+  identical results (covered by `test_gpu_scan_matches_cpu_exactly`).
+* **GPU requires the CUDA libraries:** numba needs nvvm/nvrtc/cudart/
+  libdevice. This is handled automatically when the
+  `nvidia-cuda-*-cu12` pip wheels (or a CUDA toolkit / `CUDA_HOME`) are
+  present; otherwise `gpu-status` reports the exact reason.
+* **Pure-Python CPU inner loop** — adequate for small/medium loci;
+  chromosome-scale scans will be slow (measured honestly by `bench`).
+  Numba CPU JIT (`@njit`, no CUDA needed) is a planned Week-3
+  optimisation.
+* Dask workers are CPU-only here; distributed GPU is not implemented.
+* `tracemalloc` measures Python allocations only; GPU VRAM is only
+  reported when a GPU backend actually runs.
+* `Bio.AlignIO` and compiled BioPython modules unusable under WDAC
+  (shim covers FASTA needs).
+* Chunk overlap must be ≥ guide length + PAM length (default 64).

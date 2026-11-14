@@ -64,3 +64,51 @@ async def test_full_cpu_analysis_flow():
         assert app.state.analysis is not None
         assert app.state.analysis.backend == "cpu"
         assert app.state.analysis.stats.bases_processed > 0
+        # Results metrics line reports real measurements.
+        metrics = str(app.query_one("#results-metrics").render())
+        assert "bases" in metrics and "matches found" in metrics
+        # Results table is populated.
+        table = app.query_one("#results-table")
+        assert table.row_count > 0
+        # Filtering to an impossible chromosome yields the empty state.
+        app.query_one("#f-chrom", Input).value = "no_such_chrom"
+        app.query_one("#filter-btn", Button).press()
+        await pilot.pause(0.3)
+        count = str(app.query_one("#results-count").render())
+        assert "0 of" in count or "No matches" in count
+        assert table.row_count == 0
+
+
+@pytest.mark.asyncio
+async def test_results_column_sort():
+    """Header-click sorting reorders the results table."""
+    from textual.widgets import DataTable
+    from geneware.aligner import Candidate
+    from geneware.scoring import score_candidates
+
+    app = GeneWeaverApp()
+    async with app.run_test() as pilot:
+        cands = [
+            Candidate("chr1", 10, 22, "+", 2, (1, 5), "NGG", True, "A" * 12),
+            Candidate("chr1", 30, 42, "-", 0, (), "AGG", True, "A" * 12),
+            Candidate("chr2", 5, 17, "+", 1, (3,), "CGG", True, "A" * 12),
+        ]
+        scored = score_candidates(cands)
+        # Fake a completed analysis so metrics/count render correctly.
+        from geneware.pipeline import AnalysisResult
+        from geneware.aligner import ScanStats
+        app.state.analysis = AnalysisResult(
+            backend="cpu", guide="A" * 12, pam_patterns=("NGG",),
+            strands=("+", "-"), max_mismatches=2, require_pam=True,
+            fasta_path="x", records=[], sequence_stats={},
+            candidates=cands, scored=scored, stats=ScanStats(),
+            score_summary={}, elapsed_seconds=0.0)
+        app._fill_results(app.state.analysis)
+        table = app.query_one("#results-table")
+        assert table.row_count == 3
+        # Sort by 'mm' ascending via the header-selected handler.
+        event = DataTable.HeaderSelected(table, "mm", 5, "MM")
+        app.sort_results(event)
+        await pilot.pause(0.1)
+        first_mm = str(table.get_row_at(0)[5])
+        assert first_mm == "0"

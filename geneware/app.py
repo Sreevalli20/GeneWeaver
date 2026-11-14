@@ -109,9 +109,33 @@ class GeneWeaverApp(App):
         ("ctrl+r", "refresh_status", "Refresh Status"),
     ]
 
+    # ------------------------------------------------------------- results
+
+    # column_key -> sort key function over ScoredCandidate
+    _RESULT_SORT_KEYS = {
+        "score": lambda sc: sc.score,
+        "chr": lambda sc: sc.candidate.chromosome,
+        "start": lambda sc: sc.candidate.start,
+        "end": lambda sc: sc.candidate.end,
+        "strand": lambda sc: sc.candidate.strand,
+        "mm": lambda sc: sc.candidate.mismatches,
+        "pam": lambda sc: sc.candidate.pam,
+        "pam_ok": lambda sc: int(sc.candidate.pam_compatible),
+        "mm_pos": lambda sc: sc.candidate.mismatch_positions,
+    }
+
+    _RESULT_COLUMNS = [
+        ("Score", "score"), ("Chr", "chr"), ("Start", "start"),
+        ("End", "end"), ("Strand", "strand"), ("MM", "mm"),
+        ("PAM", "pam"), ("PAM ok", "pam_ok"), ("MM pos", "mm_pos"),
+    ]
+
     def __init__(self) -> None:
         super().__init__()
         self.state = AppState()
+        self._visible_scored: list = []
+        self._sort_key: str | None = None
+        self._sort_reverse: bool = False
 
     # ------------------------------------------------------------------ UI
 
@@ -206,10 +230,13 @@ class GeneWeaverApp(App):
             with Horizontal():
                 yield Input(placeholder="min score (e.g. 80)", id="f-min-score")
                 yield Input(placeholder="chromosome filter", id="f-chrom")
+                yield Input(placeholder="search chr/PAM/strand/mm-pos",
+                            id="f-search")
                 yield Select([("All strands", "all"), ("+", "+"), ("-", "-")],
                              value="all", allow_blank=False, id="f-strand")
                 yield Button("Apply filters", id="filter-btn", variant="primary")
                 yield Button("Clear", id="filter-clear")
+            yield Static("(run an analysis first)", id="results-metrics")
             yield Static("(run an analysis first)", id="results-count")
             yield DataTable(id="results-table")
             with Horizontal():
@@ -471,24 +498,68 @@ class GeneWeaverApp(App):
         self._refresh_home_status()
 
     def _fill_results(self, result) -> None:
+        self._visible_scored = list(result.scored)
+        self._sort_key = None
+        self._sort_reverse = False
+        self._render_results()
+        sstats = result.sequence_stats or {}
+        scan = result.stats
+        total_mm = sum(c.mismatches for c in result.candidates)
+        self.query_one("#results-metrics", Static).update(
+            f"sequences processed: {sstats.get('record_count', len(result.records))}"
+            f"  |  total bases: {scan.bases_processed:,}"
+            f"  |  windows evaluated: {scan.windows_evaluated:,}"
+            f"  |  matches found: {scan.candidates_found:,}"
+            f"  |  total mismatches: {total_mm:,}"
+            f"  |  backend: {result.backend}"
+            f"  |  elapsed: {result.elapsed_seconds:.3f}s"
+        )
+
+    def _render_results(self) -> None:
+        """Render ``self._visible_scored`` into the results table."""
+        scored = self._visible_scored
+        if self._sort_key in self._RESULT_SORT_KEYS:
+            keyfn = self._RESULT_SORT_KEYS[self._sort_key]
+            scored = sorted(scored, key=keyfn, reverse=self._sort_reverse)
         table = self.query_one("#results-table", DataTable)
         table.clear(columns=True)
         table.cursor_type = "row"
-        table.add_columns("Rank", "Score", "Chr", "Start", "End", "Strand",
-                          "MM", "PAM", "PAM ok", "MM pos")
-        for rank, sc in enumerate(result.scored, start=1):
+        table.add_columns(*self._RESULT_COLUMNS)
+        for sc in scored:
             c = sc.candidate
             table.add_row(
-                str(rank), f"{sc.score:.1f}", c.chromosome, str(c.start),
+                f"{sc.score:.1f}", c.chromosome, str(c.start),
                 str(c.end), c.strand, str(c.mismatches), c.pam,
                 "yes" if c.pam_compatible else "no",
                 ",".join(map(str, c.mismatch_positions)) or "-",
-                key=None,
             )
-        self.query_one("#results-count", Static).update(
-            f"{len(result.scored):,} candidates (sorted by score; "
-            "click a column header to re-sort)"
-        )
+        analysis = self.state.analysis
+        total = len(analysis.scored) if analysis is not None else 0
+        if not scored:
+            if total == 0:
+                msg = ("No matches found. Try increasing 'Max mismatches', "
+                       "relaxing the PAM pattern, or checking the guide "
+                       "sequence.")
+            else:
+                msg = (f"0 of {total:,} candidates match the current "
+                       "filters.")
+        elif total and len(scored) != total:
+            msg = f"{len(scored):,} of {total:,} candidates (filtered)"
+        else:
+            msg = (f"{len(scored):,} candidates — click a column header "
+                   "to sort")
+        self.query_one("#results-count", Static).update(msg)
+
+    @on(DataTable.HeaderSelected, "#results-table")
+    def sort_results(self, event: DataTable.HeaderSelected) -> None:
+        key = str(event.column_key)
+        if key not in self._RESULT_SORT_KEYS:
+            return
+        if self._sort_key == key:
+            self._sort_reverse = not self._sort_reverse
+        else:
+            self._sort_key, self._sort_reverse = key, False
+        self._render_results()
 
     def _fill_score_summary(self, result) -> None:
         s = result.score_summary
@@ -510,38 +581,40 @@ class GeneWeaverApp(App):
             min_score = float(self.query_one("#f-min-score", Input).value or "-inf")
         except ValueError:
             min_score = float("-inf")
-        chrom = self.query_one("#f-chrom", Input).value.strip()
+        chrom = self.query_one("#f-chrom", Input).value.strip().lower()
+        search = self.query_one("#f-search", Input).value.strip().lower()
         strand = self.query_one("#f-strand", Select).value
-        scored = [
-            sc for sc in result.scored
-            if sc.score >= min_score
-            and (not chrom or chrom.lower() in sc.candidate.chromosome.lower())
-            and (strand == "all" or sc.candidate.strand == strand)
-        ]
-        table = self.query_one("#results-table", DataTable)
-        table.clear(columns=True)
-        table.add_columns("Rank", "Score", "Chr", "Start", "End", "Strand",
-                          "MM", "PAM", "PAM ok", "MM pos")
-        for rank, sc in enumerate(scored, start=1):
+
+        def _matches(sc) -> bool:
             c = sc.candidate
-            table.add_row(
-                str(rank), f"{sc.score:.1f}", c.chromosome, str(c.start),
-                str(c.end), c.strand, str(c.mismatches), c.pam,
-                "yes" if c.pam_compatible else "no",
-                ",".join(map(str, c.mismatch_positions)) or "-",
-            )
-        self.query_one("#results-count", Static).update(
-            f"{len(scored):,} of {len(result.scored):,} candidates "
-            "(filtered)"
-        )
+            if sc.score < min_score:
+                return False
+            if chrom and chrom not in c.chromosome.lower():
+                return False
+            if strand != "all" and c.strand != strand:
+                return False
+            if search:
+                haystack = " ".join([
+                    c.chromosome, c.strand, c.pam,
+                    ",".join(map(str, c.mismatch_positions)),
+                    str(c.start), str(c.end),
+                ]).lower()
+                if search not in haystack:
+                    return False
+            return True
+
+        self._visible_scored = [sc for sc in result.scored if _matches(sc)]
+        self._render_results()
 
     @on(Button.Pressed, "#filter-clear")
     def clear_filters(self) -> None:
         self.query_one("#f-min-score", Input).value = ""
         self.query_one("#f-chrom", Input).value = ""
+        self.query_one("#f-search", Input).value = ""
         self.query_one("#f-strand", Select).value = "all"
         if self.state.analysis is not None:
-            self._fill_results(self.state.analysis)
+            self._visible_scored = list(self.state.analysis.scored)
+            self._render_results()
 
     # ------------------------------------------------------------ benchmark
 

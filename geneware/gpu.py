@@ -22,18 +22,27 @@ and the automatic fallback.
 
 IMPORTANT for this environment
 ------------------------------
-On the development machine an Application Control (WDAC) policy blocks
-numba's native ``_helperlib`` DLL, so ``import numba`` fails and GPU
-execution is reported as unavailable even though an RTX 5050 with a
-CUDA 13.1 driver is present. The CUDA kernel code below is real and
-will execute on any machine where numba can be imported; until then the
-module reports the exact requirements instead of fabricating results.
+On the development machine numba 0.68.1 imports and the NVIDIA driver is
+visible (RTX 5050, CUDA 13.1 driver), but ``cuda.is_available()`` was
+False because the CUDA *libraries* (``nvvm.dll``, ``nvrtc``, ``cudart``,
+``libdevice``) were absent — no CUDA toolkit is installed. The
+``nvidia-cuda-nvcc-cu12`` / ``nvidia-cuda-nvrtc-cu12`` /
+``nvidia-cuda-runtime-cu12`` pip wheels do ship them, so
+:func:`_ensure_cuda_home` links those DLLs into a CUDA_HOME-layout
+directory under the user cache before numba is probed. On machines
+without those wheels (or with a blocked DLL policy) the module still
+reports GPU as unavailable with the exact requirements — never faked.
 """
 
 from __future__ import annotations
 
+import os
+import shutil
+import site
+import warnings
 from collections.abc import Iterable
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from .aligner import (
     DEFAULT_PAM_PATTERNS,
@@ -53,6 +62,10 @@ GPU_REQUIREMENTS = [
     "NVIDIA GPU with a recent driver (check with `nvidia-smi`)",
     "Python-compatible numba build: `pip install numba` "
     "(numba >= 0.59 ships CUDA support via LLVM/NVVM; no nvcc needed)",
+    "CUDA libraries (nvvm/nvrtc/cudart/libdevice): either a CUDA toolkit "
+    "install, CUDA_HOME pointing at one, or the pip wheels "
+    "`nvidia-cuda-nvcc-cu12`, `nvidia-cuda-nvrtc-cu12`, "
+    "`nvidia-cuda-runtime-cu12` (auto-detected and linked by geneware)",
     "The native numba/llvmlite DLLs must not be blocked by an "
     "Application Control / WDAC policy",
     "Optional alternative: `pip install cupy-cuda12x` (or matching "
@@ -89,8 +102,99 @@ class GpuStatus:
 _status_cache: GpuStatus | None = None
 
 
+def _iter_site_packages() -> list[Path]:
+    dirs: list[str] = []
+    try:
+        dirs.extend(site.getsitepackages())
+    except Exception:
+        pass
+    try:
+        dirs.append(site.getusersitepackages())
+    except Exception:
+        pass
+    return [Path(d) for d in dict.fromkeys(dirs) if d and Path(d).is_dir()]
+
+
+def _link_or_copy(src: Path, dst: Path) -> None:
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    if dst.exists():
+        return
+    try:
+        os.link(src, dst)
+    except OSError:
+        shutil.copy2(src, dst)
+
+
+def _provision_cuda_home() -> Path | None:
+    """Assemble a CUDA_HOME tree from ``nvidia-*-cu12`` pip wheels.
+
+    Numba locates ``nvvm.dll``/``nvrtc``/``cudart``/``libdevice`` via the
+    ``CUDA_HOME``/``CUDA_PATH`` env vars (or a conda env / system CUDA
+    toolkit). On pip-only installs the ``nvidia-cuda-nvcc-cu12``,
+    ``nvidia-cuda-nvrtc-cu12`` and ``nvidia-cuda-runtime-cu12`` wheels
+    ship exactly those libraries, but under per-package directories that
+    numba does not search. This function links them into a single
+    CUDA-layout directory under the user cache so numba can find them.
+
+    Returns the staging directory, or ``None`` when the wheels are not
+    installed (nothing is created then).
+    """
+    nvidia_roots = [sp / "nvidia" for sp in _iter_site_packages()]
+    nvvm_dlls = sorted(
+        p for root in nvidia_roots
+        for p in (root / "cuda_nvcc" / "nvvm" / "bin").glob("nvvm*.dll")
+        if p.is_file()
+    )
+    if not nvvm_dlls:
+        return None
+
+    base = Path(os.environ.get("LOCALAPPDATA") or (Path.home() / ".cache"))
+    home = base / "geneware" / "cuda-home"
+
+    for dll in nvvm_dlls:
+        _link_or_copy(dll, home / "nvvm" / "bin" / dll.name)
+    libdevice_dir = home / "nvvm" / "libdevice"
+    libdevice_dir.mkdir(parents=True, exist_ok=True)
+    for bc in sorted(
+        p for root in nvidia_roots
+        for p in (root / "cuda_nvcc" / "nvvm" / "libdevice").glob("libdevice*.bc")
+        if p.is_file()
+    ):
+        _link_or_copy(bc, libdevice_dir / bc.name)
+    for root in nvidia_roots:
+        for dll in (root / "cuda_runtime" / "bin").glob("*.dll"):
+            _link_or_copy(dll, home / "bin" / dll.name)
+        for dll in (root / "cuda_nvrtc" / "bin").glob("*.dll"):
+            _link_or_copy(dll, home / "bin" / dll.name)
+
+    return home
+
+
+def _ensure_cuda_home() -> None:
+    """Point ``CUDA_HOME`` at provisioned nvidia-wheel libraries if needed.
+
+    Must run *before* numba's CUDA path cache is populated (i.e. before the
+    first ``cuda.is_available()`` call). Respects a user-supplied
+    ``CUDA_HOME``/``CUDA_PATH`` and clears numba's cached search result if
+    numba was already imported earlier in the process.
+    """
+    if os.environ.get("CUDA_HOME") or os.environ.get("CUDA_PATH"):
+        return
+    home = _provision_cuda_home()
+    if home is None:
+        return
+    os.environ["CUDA_HOME"] = str(home)
+    try:
+        from numba.cuda import cuda_paths  # type: ignore
+        if hasattr(cuda_paths.get_cuda_paths, "_cached_result"):
+            del cuda_paths.get_cuda_paths._cached_result
+    except Exception:
+        pass
+
+
 def _probe_numba() -> GpuStatus | None:
     """Return a GpuStatus if numba+CUDA is usable, else None."""
+    _ensure_cuda_home()
     try:
         from numba import cuda  # type: ignore
     except Exception as exc:  # ImportError or blocked-DLL OSError
@@ -107,14 +211,25 @@ def _probe_numba() -> GpuStatus | None:
                        "(no CUDA device visible to the driver)",
             )
         dev = cuda.get_current_device()
-        name = str(dev.name).strip()
+        raw_name = dev.name
+        name = (raw_name.decode() if isinstance(raw_name, bytes)
+                else str(raw_name)).strip()
         cc = ".".join(str(x) for x in dev.compute_capability)
-        # Device attributes expose memory in bytes on most backends.
+        vram_mb = None
         try:
-            vram = dev.attributes.get("TOTAL_GLOBAL_MEM", None)
-            vram_mb = vram / (1024 * 1024) if isinstance(vram, int) else None
+            # cuMemGetInfo needs an active context; select_device creates one.
+            cuda.select_device(0)
+            from ctypes import byref, c_size_t
+            from numba.cuda.cudadrv.driver import driver as _drv  # type: ignore
+            _free, _total = c_size_t(), c_size_t()
+            _drv.cuMemGetInfo(byref(_free), byref(_total))
+            vram_mb = _total.value / (1024 * 1024)
         except Exception:
-            vram_mb = None
+            try:
+                vram = dev.attributes.get("TOTAL_GLOBAL_MEM", None)
+                vram_mb = vram / (1024 * 1024) if isinstance(vram, int) else None
+            except Exception:
+                vram_mb = None
         return GpuStatus(
             available=True,
             backend="numba-cuda",
@@ -212,6 +327,7 @@ def _numba_scan(
     strands: Iterable[str],
     max_mismatches: int,
     require_pam: bool,
+    progress: "object | None" = None,
 ) -> tuple[list[Candidate], ScanStats]:
     """GPU scan via numba.cuda. Only called when detect_gpu() is available.
 
@@ -224,13 +340,16 @@ def _numba_scan(
     """
     # Lazy import: numba is only imported on machines where it works.
     import numpy as np
-    from numba import cuda, uint8, int32, int64  # type: ignore
+    from numba import cuda  # type: ignore
+    from numba.core.errors import NumbaPerformanceWarning  # type: ignore
 
-    from .chunking import chunk_records
+    # Kernel-launch occupancy warnings are noise for batch scans.
+    warnings.filterwarnings("ignore", category=NumbaPerformanceWarning)
 
-    guide_rc = guide.translate(
-        str.maketrans("ACGT", "TGCA")
-    )[::-1]
+    from .aligner import _mismatch_positions, _pam_matches, deduplicate, revcomp
+    from .chunking import chunk_records, total_chunks
+
+    guide_rc = revcomp(guide)
 
     @cuda.jit
     def _count_mm_kernel(seq_u8, guide_u8, starts, n_starts, mm_out):
@@ -266,6 +385,8 @@ def _numba_scan(
 
     all_candidates: list[Candidate] = []
     stats = ScanStats()
+    n_total = total_chunks(records, chunk_size, overlap)
+    done_chunks = 0
 
     for chunk in chunk_records(records, chunk_size, overlap):
         seq = chunk.sequence
@@ -301,24 +422,30 @@ def _numba_scan(
             mm = d_mm.copy_to_host()
             stats.windows_evaluated += len(tasks)
             for (i, _g, _p), m in zip(tasks, mm):
-                if m <= max_mismatches:
-                    pam = seq[i + L : i + L + pam_len]
-                    from .aligner import _pam_matches, _mismatch_positions
-                    compat = _pam_matches(pam, patterns)
-                    if compat or not require_pam:
-                        stats.candidates_found += 1
-                        window = seq[i : i + L]
-                        all_candidates.append(Candidate(
-                            chromosome=chunk.chromosome,
-                            start=chunk.start + i,
-                            end=chunk.start + i + L,
-                            strand="+",
-                            mismatches=int(m),
-                            mismatch_positions=_mismatch_positions(guide, window),
-                            pam=pam,
-                            pam_compatible=compat,
-                            guide=guide,
-                        ))
+                # The kernel is an ACGT-exact pre-filter; every surviving
+                # window is re-verified with the exact IUPAC semantics so
+                # reported mismatches/positions always match the CPU path.
+                if m > max_mismatches:
+                    continue
+                window = seq[i : i + L]
+                mm_pos = _mismatch_positions(guide, window)
+                if len(mm_pos) > max_mismatches:
+                    continue
+                pam = seq[i + L : i + L + pam_len]
+                compat = _pam_matches(pam, patterns)
+                if compat or not require_pam:
+                    stats.candidates_found += 1
+                    all_candidates.append(Candidate(
+                        chromosome=chunk.chromosome,
+                        start=chunk.start + i,
+                        end=chunk.start + i + L,
+                        strand="+",
+                        mismatches=len(mm_pos),
+                        mismatch_positions=mm_pos,
+                        pam=pam,
+                        pam_compatible=compat,
+                        guide=guide,
+                    ))
 
         # '-' strand: compare guide reverse-complement against the window
         # in reverse order. Implement by scanning reversed guide against
@@ -342,10 +469,10 @@ def _numba_scan(
                 Lg = guide_rc_u8.shape[0]
                 cnt = 0
                 for k in range(Lg):
-                    # position k of guide_rc corresponds to window position
-                    # L-1-k; guide_rc[k] should equal seq[i + L-1-k]
+                    # guide_rc == revcomp(guide); a minus-strand window
+                    # matches iff window[k] == guide_rc[k] for all k.
                     g = guide_rc_u8[k]
-                    w = seq_u8[i + Lg - 1 - k]
+                    w = seq_u8[i + k]
                     if g != w:
                         cnt += 1
                 mm_out[t] = cnt
@@ -356,29 +483,34 @@ def _numba_scan(
                                              d_starts, len(minus_tasks), d_mm)
             mm = d_mm.copy_to_host()
             stats.windows_evaluated += len(minus_tasks)
-            from .aligner import _pam_matches, _mismatch_positions, revcomp
             for i, m in zip(minus_tasks, mm):
-                if m <= max_mismatches:
-                    pam = revcomp(seq[i - pam_len : i])
-                    compat = _pam_matches(pam, patterns)
-                    if compat or not require_pam:
-                        stats.candidates_found += 1
-                        window_rc = revcomp(seq[i : i + L])
-                        all_candidates.append(Candidate(
-                            chromosome=chunk.chromosome,
-                            start=chunk.start + i,
-                            end=chunk.start + i + L,
-                            strand="-",
-                            mismatches=int(m),
-                            mismatch_positions=_mismatch_positions(guide, window_rc),
-                            pam=pam,
-                            pam_compatible=compat,
-                            guide=guide,
-                        ))
+                if m > max_mismatches:
+                    continue
+                window_rc = revcomp(seq[i : i + L])
+                mm_pos = _mismatch_positions(guide, window_rc)
+                if len(mm_pos) > max_mismatches:
+                    continue
+                pam = revcomp(seq[i - pam_len : i])
+                compat = _pam_matches(pam, patterns)
+                if compat or not require_pam:
+                    stats.candidates_found += 1
+                    all_candidates.append(Candidate(
+                        chromosome=chunk.chromosome,
+                        start=chunk.start + i,
+                        end=chunk.start + i + L,
+                        strand="-",
+                        mismatches=len(mm_pos),
+                        mismatch_positions=mm_pos,
+                        pam=pam,
+                        pam_compatible=compat,
+                        guide=guide,
+                    ))
 
         del d_seq
+        done_chunks += 1
+        if progress is not None:
+            progress(done_chunks, max(n_total, 1))
 
-    from .aligner import deduplicate
     unique = deduplicate(all_candidates)
     stats.candidates_found = len(unique)
     return unique, stats
@@ -420,6 +552,7 @@ def scan_gpu(
         chunk_size=chunk_size, overlap=overlap,
         pam_patterns=pam_patterns, strands=strands,
         max_mismatches=max_mismatches, require_pam=require_pam,
+        progress=progress,
     )
 
 

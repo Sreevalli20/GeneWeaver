@@ -3,10 +3,10 @@
 GeneWeaver is a Python application for CRISPR guide-RNA off-target style
 protospacer search. It parses real FASTA genomes, scans both DNA strands
 for guide matches with configurable PAM and mismatch tolerance, ranks
-hits with an experimental scoring model, and can execute on CPU, GPU
-(Numba CUDA — verified on the RTX 5050 in this repo), or a
-Dask-distributed CPU cluster — with real measured benchmarks and
-exportable reports.
+hits with an experimental scoring model, and can execute on CPU
+(Numba-JIT engine — the default), GPU (Numba CUDA — verified on the
+RTX 5050 in this repo), or a Dask-distributed CPU cluster — with real
+measured benchmarks and exportable reports.
 
 > **Honesty note:** the off-target *score* is an internally designed
 > heuristic for ranking candidates. It is **not** a medically validated
@@ -49,7 +49,8 @@ geneware/
   __main__.py      `python -m geneware` entry point
   fasta.py         FASTA parsing + validation + statistics (BioPython)
   chunking.py      memory-conscious genome chunker with coordinates
-  aligner.py       CPU protospacer/PAM scanner (IUPAC-aware, both strands)
+  aligner.py       CPU protospacer/PAM scanner — numba-JIT engine with
+                   encoded IUPAC table + pure-Python fallback
   scoring.py       experimental off-target ranking score (heuristic-v1)
   gpu.py           GPU detection (numba.cuda / cupy) + CUDA kernel path
   dask_engine.py   Dask-distributed chunk processing + worker status
@@ -58,8 +59,10 @@ geneware/
   reports.py       CSV / JSON / HTML report export
   app.py           Textual dashboard — 10 functional tabs
   cli.py           argparse CLI (parse/scan/bench/analyze/report/gpu-status)
-tests/             pytest suite (85 tests)
+tests/             pytest suite (102 tests)
 data/example.fasta small synthetic demo genome (test fixture)
+data/bench_20mb.fasta 20 Mbp synthetic benchmark genome (3 records,
+                   90 planted guide+PAM hits)
 requirements.txt   pinned dependencies (+ optional GPU notes)
 pytest.ini         pytest-asyncio configuration
 ```
@@ -82,6 +85,16 @@ pytest.ini         pytest-asyncio configuration
 * Configurable max mismatches; mismatch positions recorded.
 * 0-based half-open `[start, end)` coordinates on the plus strand.
 * Chunk-overlap deduplication (key: chr/start/end/strand).
+* **Day-4 CPU engine:** bases are encoded to 4-bit IUPAC codes and the
+  per-window scan runs as table lookups. When `numba` imports, an
+  `@njit(nogil=True)` kernel counts mismatches with early exit at
+  `max_mismatches+1`; only surviving windows are re-scored on CPU for
+  exact IUPAC positions and PAM strings, so results are identical to
+  the pure-Python path (verified by parity tests). Force the fallback
+  with `GENEWEARE_ALIGNER_ENGINE=python` (useful for A/B benchmarks).
+* **Overlap safety:** `validate_overlap` raises a clear `AlignError`
+  when `overlap < len(guide)+pam_len` on multi-chunk records, so
+  boundary-spanning matches can never be silently missed.
 
 ### Biological scoring (`scoring.py`, Scoring tab)
 * Experimental heuristic `geneware-heuristic-v1`, clearly labelled as
@@ -98,11 +111,12 @@ pytest.ini         pytest-asyncio configuration
 * `_ensure_cuda_home()` auto-provisions the CUDA libraries numba needs
   from the `nvidia-*-cu12` pip wheels (or respects a user-set
   `CUDA_HOME`/`CUDA_PATH` / CUDA toolkit).
-* Real CUDA implementation via `@cuda.jit` kernels (one thread per
-  window start, per strand) with device buffers. Every GPU hit is
-  re-verified on CPU with the exact IUPAC/PAM semantics before being
-  reported, so coordinates, mismatch positions, and scores are always
-  consistent with the CPU path.
+* Real CUDA implementation via a single `@cuda.jit` kernel (one thread
+  per window start, shared by both strands via forward/revcomp guide
+  codes) compiled once per process. Window starts are `np.arange`
+  ranges and only kernel-surviving windows are re-verified on CPU with
+  the exact IUPAC/PAM semantics, so coordinates, mismatch positions,
+  and scores are always consistent with the CPU path.
 * `scan_with_fallback` returns a truthful `'gpu'`/`'cpu'` backend tag.
 * **Conservative difference:** the kernels compare exact ACGT codes, so
   windows containing ambiguous (IUPAC) bases can be filtered out even
@@ -114,8 +128,11 @@ pytest.ini         pytest-asyncio configuration
 ### Dask processing (`dask_engine.py`, Dask tab)
 * Genome split into `GenomeChunk`s; each chunk is an independent task
   submitted to a `distributed.LocalCluster` (processes or threads).
-* `as_completed` progress tracking; per-task error capture (failed
-  workers are counted and listed, never faked).
+* **Day-4:** futures are submitted through a rolling window (~4 per
+  worker) instead of all at once, bounding peak memory; chunks are
+  produced lazily. `as_completed` progress tracking; per-task error
+  capture (failed workers are counted and listed, never faked);
+  `chunks_pending` is reported alongside completed/total.
 * Results merged with the same `deduplicate` as sequential scan.
 * `dask_status()` reports real worker/thread/memory measurements.
 * Backend honestly reported as `dask-processes`, `dask-threads`, or
@@ -132,7 +149,10 @@ pytest.ini         pytest-asyncio configuration
    search filters, quick CSV/JSON/HTML export, explicit empty-state
    message when nothing matches.
 5. **Scoring** — formula explanation + last-run score summary.
-6. **Performance** — benchmark runner for cpu/gpu/dask backends.
+6. **Performance** — GPU availability probe, benchmark runner for
+   cpu/gpu/dask backends, and a "last run" panel showing method,
+   status, chunks done/total, elapsed time, measured throughput,
+   peak Python memory, and candidate counts.
 7. **Dask** — real scheduler status + one-click Dask analysis.
 8. **Benchmarks** — comparison table of every recorded run.
 9. **Reports** — write CSV/JSON/HTML/bundle to the configured dir.
@@ -141,9 +161,28 @@ pytest.ini         pytest-asyncio configuration
 ### Benchmarking (`benchmark.py`, `pipeline.py`)
 * `perf_counter_ns` timing split parse/align/total; `tracemalloc` peak
   Python memory (reported `n/a` when unavailable); bases/s and
-  windows/s throughput; backend recorded in notes.
+  windows/s throughput; backend recorded in notes and in
+  `BenchmarkResult.backend`.
+* `run_analysis` also measures real peak Python memory per run
+  (`extra["memory_peak_bytes"]`) and reports `chunks_total` /
+  `chunks_completed` / `chunks_pending` for every backend.
 * CPU-vs-GPU comparison only appears when both backends actually ran —
-  never fabricated.
+  never fabricated. CLI: `bench --backend cpu|gpu|dask` or
+  `bench --compare` (runs the identical workload on CPU then GPU).
+
+#### Measured on this machine (20 Mbp synthetic genome, guide 20 nt,
+max_mismatches=0, both strands, chunk_size=1 Mb, overlap=64)
+
+| Backend | Align time | Throughput | Candidates |
+|---------|-----------|------------|------------|
+| CPU numba-JIT (default) | 6.24 s | 3.21 M bases/s | 90 |
+| CPU pure-Python fallback | 27.68 s | 0.72 M bases/s | 90 |
+| GPU numba-cuda (RTX 5050) | 1.98 s | 10.11 M bases/s | 90 |
+| Dask processes x4 (1 Mb chunks) | 11.31 s | 1.77 M bases/s | 90 |
+| Dask threads x8 | 55.44 s | 0.36 M bases/s | 90 |
+
+All backends returned identical candidate sets on this input. First
+numba scan in a process includes ~1-2 s of JIT compilation.
 
 ### Reports (`reports.py`)
 * CSV (ranked candidates), JSON (full settings + stats + candidates),
@@ -177,13 +216,17 @@ python -m geneware.cli scan data\example.fasta --guide CCCCggggnnnnAAAACCCC
 python -m geneware.cli analyze data\example.fasta --guide CCCCggggnnnnAAAACCCC --backend cpu
 python -m geneware.cli analyze data\example.fasta --guide CCCCggggnnnnAAAACCCC --backend dask --threads
 python -m geneware.cli bench data\example.fasta --guide CCCCggggnnnnAAAACCCC
+python -m geneware.cli bench data\bench_20mb.fasta --guide GAGTCCGAGCAGAAGAAGAA --compare
+python -m geneware.cli bench data\bench_20mb.fasta --guide GAGTCCGAGCAGAAGAAGAA --backend dask --workers 4
 python -m geneware.cli report data\example.fasta --guide CCCCggggnnnnAAAACCCC --out-dir reports
 python -m geneware.cli gpu-status
 ```
 
 Common options: `--chunk-size`, `--overlap`, `--pam`, `--strand`,
 `--max-mismatches`, `--allow-pam-mismatch`, `--backend cpu|gpu|dask`,
-`--workers`, `--threads`, `--json`.
+`--workers`, `--threads`, `--compare`, `--json`.
+`GENEWEARE_ALIGNER_ENGINE=python` forces the pure-Python CPU engine
+(for A/B benchmarking against the numba-JIT default).
 
 ## Testing
 
@@ -191,14 +234,17 @@ Common options: `--chunk-size`, `--overlap`, `--pam`, `--strand`,
 python -m pytest tests -q
 ```
 
-85 tests cover: FASTA parsing edge cases, chunk boundaries, both
+102 tests cover: FASTA parsing edge cases, chunk boundaries, both
 strands, PAM matching, mismatch positions, deduplication, scoring
 formula/ranking, GPU detection contract + CPU fallback + real GPU
 execution parity with CPU (skipped automatically when no GPU backend
-is usable), Dask scan equality with sequential results, report
-generation, pipeline backends, and Textual app smoke tests (tab
-mounting, genome load, full CPU analysis, results metrics, filtering
-empty state).
+is usable), numba-vs-Python engine parity, overlap validation,
+multi-record/large-FASTA scans, compute_stats correctness, dask
+scan equality with sequential results + pending/completed tracking,
+report generation, pipeline backends + memory-error surfacing,
+benchmark backend field, and Textual app smoke tests (tab mounting,
+genome load, full CPU analysis, results metrics, filtering empty
+state).
 
 ## Coordinate & matching conventions
 
@@ -220,10 +266,19 @@ empty state).
   libdevice. This is handled automatically when the
   `nvidia-cuda-*-cu12` pip wheels (or a CUDA toolkit / `CUDA_HOME`) are
   present; otherwise `gpu-status` reports the exact reason.
-* **Pure-Python CPU inner loop** — adequate for small/medium loci;
-  chromosome-scale scans will be slow (measured honestly by `bench`).
-  Numba CPU JIT (`@njit`, no CUDA needed) is a planned Week-3
-  optimisation.
+* **CPU engine needs numba for full speed:** without numba the
+  encoded pure-Python fallback is correct but ~5x slower (measured
+  below). Numba JIT-compiles on first scan (~1-2 s once per process).
+* **Dask overhead on small chunk counts:** each worker process
+  re-JIT-compiles the kernel and pickles chunk sequences; on the
+  20 Mbp benchmark (23 chunks) sequential numba was faster than
+  dask-processes. Dask pays off on larger inputs / more workers.
+* **Dask threads are GIL-limited:** the njit kernel releases the GIL
+  (`nogil=True`), but thread workers were still slower than processes
+  in measurements — prefer `--workers N` (processes) for real speedup.
+* Whole-record sequences are held in memory (BioPython `SeqIO`
+  semantics); chunking bounds *scan* memory but not *parse* memory.
+  Very large genomes may need a streaming parser (not implemented).
 * Dask workers are CPU-only here; distributed GPU is not implemented.
 * `tracemalloc` measures Python allocations only; GPU VRAM is only
   reported when a GPU backend actually runs.

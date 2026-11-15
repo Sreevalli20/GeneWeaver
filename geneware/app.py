@@ -47,7 +47,7 @@ from textual.widgets import (
 )
 
 from .aligner import AlignError, validate_guide
-from .benchmark import format_result
+from .benchmark import format_bytes, format_result
 from .dask_engine import dask_status
 from .fasta import FastaParseError, compute_stats, iter_fasta
 from .gpu import detect_gpu
@@ -253,12 +253,15 @@ class GeneWeaverApp(App):
 
     def _performance_tab(self) -> TabPane:
         with TabPane("Performance", id="tab-performance"):
+            yield Static("(probing GPU…)", id="perf-gpu")
             with Horizontal():
                 yield Select(BACKEND_OPTIONS, value="cpu", allow_blank=False,
                              id="bench-backend")
                 yield Button("Run Benchmark", id="bench-run", variant="warning")
             yield ProgressBar(total=100, show_eta=False, id="bench-progress")
             yield Static("(no benchmark run yet)", id="bench-out")
+            yield Label("Last run (measured)", classes="section-label")
+            yield Static("(no analysis yet)", id="perf-last")
             yield RichLog(id="perf-log", wrap=True)
 
     def _dask_tab(self) -> TabPane:
@@ -362,9 +365,55 @@ class GeneWeaverApp(App):
         except Exception:
             pass
 
+    def _refresh_perf_gpu(self) -> None:
+        gpu = detect_gpu()
+        if gpu.available:
+            text = (f"GPU: AVAILABLE — {gpu.device_name} "
+                    f"(VRAM {gpu.vram_total_mb:.0f} MiB, "
+                    f"CC {gpu.compute_capability}, backend {gpu.backend})"
+                    if gpu.vram_total_mb is not None else
+                    f"GPU: AVAILABLE — {gpu.device_name} "
+                    f"(backend {gpu.backend})")
+        else:
+            text = f"GPU: unavailable — {gpu.reason}"
+        try:
+            self.query_one("#perf-gpu", Static).update(text)
+        except Exception:
+            pass
+
+    def _update_perf_last(self, analysis) -> None:
+        """Render the last run's measured performance into the panel."""
+        st = analysis.stats
+        ex = analysis.extra or {}
+        elapsed = analysis.elapsed_seconds
+        tput = st.bases_processed / elapsed if elapsed > 0 else 0.0
+        wput = st.windows_evaluated / elapsed if elapsed > 0 else 0.0
+        chunks_done = ex.get("chunks_completed", st.chunks_scanned)
+        chunks_total = ex.get("chunks_total", st.chunks_scanned)
+        mem = ex.get("memory_peak_bytes")
+        mode = ex.get("mode") or ex.get("dask_backend") or ""
+        failed = ex.get("tasks_failed", 0)
+        status = "completed" if not failed else f"completed, {failed} task(s) failed"
+        lines = [
+            f"method      : {analysis.backend} {mode}".rstrip(),
+            f"status      : {status}",
+            f"chunks      : {chunks_done}/{chunks_total}",
+            f"time        : {elapsed:.3f} s",
+            f"throughput  : {tput:,.0f} bases/s ({wput:,.0f} windows/s)",
+            f"bases       : {st.bases_processed:,}   "
+            f"windows: {st.windows_evaluated:,}   "
+            f"candidates: {st.candidates_found:,}",
+            f"peak python memory: {format_bytes(mem)}",
+        ]
+        try:
+            self.query_one("#perf-last", Static).update("\n".join(lines))
+        except Exception:
+            pass
+
     def action_refresh_status(self) -> None:
         self._refresh_home_status()
         self._refresh_dask_status()
+        self._refresh_perf_gpu()
 
     # ------------------------------------------------------- genome loading
 
@@ -492,6 +541,7 @@ class GeneWeaverApp(App):
                f"{result.elapsed_seconds:.3f}s")
         self._log("#analyzer-log", msg)
         self._log("#home-log", msg)
+        self._update_perf_last(result)
         if result.extra.get("tasks_failed"):
             self._log("#analyzer-log",
                       f"WARNING: {result.extra['tasks_failed']} dask task(s) failed")
@@ -673,6 +723,7 @@ class GeneWeaverApp(App):
         self.state.analysis = analysis  # keep results consistent
         self._fill_results(analysis)
         self._fill_score_summary(analysis)
+        self._update_perf_last(analysis)
         self.query_one("#bench-out", Static).update(
             format_result(result)
             + f"\n  candidates : {len(analysis.candidates):,}"
@@ -689,10 +740,8 @@ class GeneWeaverApp(App):
         table.add_columns("Backend", "Align s", "Total s", "Bases", "Windows",
                           "Candidates", "Bases/s", "Peak mem")
         for r in self.state.benchmarks:
-            backend = next((n for n in r.notes if n.startswith("backend:")),
-                           "cpu")
             table.add_row(
-                backend.split(":", 1)[-1].strip(),
+                r.backend,
                 f"{r.align_ns / 1e9:.4f}", f"{r.total_seconds:.4f}",
                 f"{r.bases_processed:,}", f"{r.windows_evaluated:,}",
                 f"{r.candidates_found:,}",
@@ -791,6 +840,7 @@ class GeneWeaverApp(App):
     def on_mount(self) -> None:
         self._refresh_home_status()
         self._refresh_dask_status()
+        self._refresh_perf_gpu()
 
 
 def main() -> None:

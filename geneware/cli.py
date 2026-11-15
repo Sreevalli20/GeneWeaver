@@ -17,9 +17,10 @@ import sys
 from pathlib import Path
 
 from .aligner import AlignError, scan_records, validate_guide
-from .benchmark import format_result, run_benchmark
+from .benchmark import format_result
 from .fasta import FastaParseError, compute_stats, iter_fasta
 from .pipeline import AnalysisError, run_analysis
+from .pipeline import run_benchmark as run_pipeline_benchmark
 
 
 def _add_common(p: argparse.ArgumentParser) -> None:
@@ -93,23 +94,43 @@ def cmd_scan(args: argparse.Namespace) -> int:
 
 
 def cmd_bench(args: argparse.Namespace) -> int:
-    try:
-        result, candidates, _ = run_benchmark(
-            args.fasta, args.guide,
-            chunk_size=args.chunk_size, overlap=args.overlap,
-            pam_patterns=_pams(args), strands=_strands(args),
-            max_mismatches=args.max_mismatches,
-            require_pam=not args.allow_pam_mismatch,
-        )
-    except (FastaParseError, AlignError) as exc:
-        print(f"ERROR: {exc}", file=sys.stderr)
-        return 2
+    # --compare runs the same input/settings on CPU then GPU (when a GPU
+    # backend genuinely works) so both measured results are shown.
+    if getattr(args, "compare", False):
+        backends = ["cpu", "gpu"]
+    else:
+        backends = [args.backend]
 
-    print(format_result(result))
-    print(f"candidates (deduplicated): {len(candidates):,}")
-    if args.json:
-        print(json.dumps(result.to_dict(), indent=2))
-    return 0
+    rc = 0
+    for backend in backends:
+        if backend == "gpu":
+            from .gpu import gpu_available
+            if not gpu_available():
+                print("SKIP gpu: no usable GPU backend "
+                      "(see `python -m geneware.cli gpu-status`)",
+                      file=sys.stderr)
+                continue
+        try:
+            result, analysis = run_pipeline_benchmark(
+                args.fasta, args.guide, backend=backend,
+                chunk_size=args.chunk_size, overlap=args.overlap,
+                pam_patterns=_pams(args), strands=_strands(args),
+                max_mismatches=args.max_mismatches,
+                require_pam=not args.allow_pam_mismatch,
+                n_workers=getattr(args, "workers", None),
+                processes=not getattr(args, "threads", False),
+                progress=_progress,
+            )
+        except (FastaParseError, AlignError, AnalysisError) as exc:
+            print(f"ERROR [{backend}]: {exc}", file=sys.stderr)
+            rc = 2
+            continue
+
+        print(format_result(result))
+        print(f"candidates (deduplicated): {len(analysis.candidates):,}")
+        if args.json:
+            print(json.dumps(result.to_dict(), indent=2))
+    return rc
 
 
 def _progress(done: int, total: int) -> None:
@@ -197,11 +218,15 @@ def build_parser() -> argparse.ArgumentParser:
     _add_common(p_scan)
     p_scan.set_defaults(func=cmd_scan)
 
-    p_bench = sub.add_parser("bench", help="timed end-to-end CPU benchmark")
+    p_bench = sub.add_parser("bench", help="timed end-to-end benchmark")
     p_bench.add_argument("fasta", help="path to FASTA file")
     p_bench.add_argument("--guide", required=True, help="guide spacer sequence")
     p_bench.add_argument("--json", action="store_true", help="also emit JSON")
+    p_bench.add_argument("--compare", action="store_true",
+                         help="run the same workload on cpu then gpu and "
+                              "print both measured results")
     _add_common(p_bench)
+    _add_backend(p_bench)
     p_bench.set_defaults(func=cmd_bench)
 
     p_an = sub.add_parser("analyze", help="full analysis with scoring")

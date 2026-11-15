@@ -36,6 +36,7 @@ from .aligner import (
     deduplicate,
     scan_chunk,
     validate_guide,
+    validate_overlap,
 )
 from .chunking import chunk_records, total_chunks
 from .fasta import FastaRecord
@@ -58,7 +59,8 @@ class DaskScanResult:
     backend: str                     # 'dask-processes' | 'dask-threads'
     chunks_total: int
     chunks_completed: int
-    tasks_failed: int
+    chunks_pending: int = 0          # tasks not yet finished (0 at end)
+    tasks_failed: int = 0
     errors: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, object]:
@@ -66,6 +68,7 @@ class DaskScanResult:
             "backend": self.backend,
             "chunks_total": self.chunks_total,
             "chunks_completed": self.chunks_completed,
+            "chunks_pending": self.chunks_pending,
             "tasks_failed": self.tasks_failed,
             "errors": self.errors,
             "stats": self.stats.to_dict(),
@@ -106,7 +109,11 @@ def _merge_stats(a: ScanStats, b: ScanStats) -> ScanStats:
 
 
 def _make_client(n_workers: int | None, processes: bool):
-    """Create a dask.distributed Client; threads fallback on failure."""
+    """Create a dask.distributed Client; threads fallback on failure.
+
+    Returns ``(client, backend, n_workers)`` so callers can size their
+    in-flight task window from the *actual* worker count.
+    """
     try:
         from distributed import Client, LocalCluster
     except Exception as exc:
@@ -122,15 +129,15 @@ def _make_client(n_workers: int | None, processes: bool):
                 n_workers=workers, threads_per_worker=1,
                 processes=True, dashboard_address=None,
             )
-            return Client(cluster), backend
-        return Client(n_workers=workers, threads_per_worker=1,
-                      processes=False), backend
+            return Client(cluster), backend, workers
+        return (Client(n_workers=workers, threads_per_worker=1,
+                       processes=False), backend, workers)
     except Exception:
         if processes:
             # Process-based clusters can fail on restricted Windows setups;
             # fall back to threads honestly and report the real backend.
-            return Client(n_workers=workers, threads_per_worker=1,
-                          processes=False), "dask-threads"
+            return (Client(n_workers=workers, threads_per_worker=1,
+                           processes=False), "dask-threads", workers)
         raise
 
 
@@ -156,17 +163,18 @@ def scan_records_dask(
     """
     guide = validate_guide(guide)
     records = list(records)
+    validate_overlap(records, guide, chunk_size, overlap, pam_patterns)
     pams = tuple("".join(p.split()).upper() for p in pam_patterns)
     strand_tuple = tuple(strands)
 
-    chunks = list(chunk_records(records, chunk_size, overlap))
     n_total = total_chunks(records, chunk_size, overlap)
 
     own_client = client is None
     if own_client:
-        client, backend = _make_client(n_workers, processes)
+        client, backend, workers = _make_client(n_workers, processes)
     else:
         backend = "dask-external"
+        workers = n_workers or _default_workers()
 
     stats = ScanStats()
     all_candidates: list[Candidate] = []
@@ -177,26 +185,53 @@ def scan_records_dask(
     try:
         from dask.distributed import as_completed
 
-        futures = [
-            client.submit(
+        # Rolling submission window: at most ~4 tasks per worker are kept
+        # in flight, so peak memory stays bounded (each pending future
+        # pins one chunk's sequence) instead of materialising every chunk
+        # future up front. Chunks are still produced lazily.
+        window = max(8, workers * 4)
+        chunk_iter = iter(chunk_records(records, chunk_size, overlap))
+        exhausted = False
+        futures: list[Any] = []
+
+        def _submit() -> bool:
+            nonlocal exhausted
+            if exhausted:
+                return False
+            try:
+                ch = next(chunk_iter)
+            except StopIteration:
+                exhausted = True
+                return False
+            futures.append(client.submit(
                 _scan_chunk_task, ch, guide, pams, strand_tuple,
                 max_mismatches, require_pam,
                 pure=False,
-            )
-            for ch in chunks
-        ]
-        for fut in as_completed(futures):
-            try:
-                cands, cstats = fut.result()
-            except Exception as exc:  # worker failure: record, continue
-                failed += 1
-                errors.append(f"{type(exc).__name__}: {exc}")
-            else:
-                all_candidates.extend(cands)
-                _merge_stats(stats, cstats)
-            done += 1
-            if progress is not None:
-                progress(done, max(n_total, len(chunks), 1))
+            ))
+            return True
+
+        while True:
+            while len(futures) < window and _submit():
+                pass
+            if not futures:
+                break
+            # as_completed yields each future as it finishes; topping the
+            # window back up inside the loop keeps workers saturated.
+            for fut in as_completed(list(futures)):
+                futures.remove(fut)
+                try:
+                    cands, cstats = fut.result()
+                except Exception as exc:  # worker failure: record, continue
+                    failed += 1
+                    errors.append(f"{type(exc).__name__}: {exc}")
+                else:
+                    all_candidates.extend(cands)
+                    _merge_stats(stats, cstats)
+                done += 1
+                if progress is not None:
+                    progress(done, max(n_total, 1))
+                while len(futures) < window and _submit():
+                    pass
     finally:
         if own_client:
             client.close()
@@ -209,6 +244,7 @@ def scan_records_dask(
         backend=backend,
         chunks_total=n_total,
         chunks_completed=done - failed,
+        chunks_pending=max(0, n_total - done),
         tasks_failed=failed,
         errors=errors,
     )
@@ -219,7 +255,7 @@ def dask_status(client: Any | None = None) -> dict[str, object]:
     own = client is None
     try:
         if own:
-            client, _ = _make_client(None, processes=False)
+            client, _, _ = _make_client(None, processes=False)
         info = client.scheduler_info()
         workers = info.get("workers", {})
         n_workers = len(workers)

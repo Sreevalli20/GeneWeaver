@@ -49,7 +49,14 @@ from .aligner import (
     DEFAULT_STRANDS,
     Candidate,
     ScanStats,
+    _mismatch_positions,
+    _pam_matches,
+    _validate_scan_args,
+    deduplicate,
+    revcomp,
     scan_records,
+    validate_guide,
+    validate_overlap,
 )
 from .fasta import FastaRecord
 
@@ -317,6 +324,44 @@ def gpu_available() -> bool:
 # base; ambiguous bases only match via the PAM/IUPAC logic on CPU post-filter,
 # so the kernel uses exact ACGT matching and ambiguous positions simply never
 # equal a guide base (documented conservative behaviour).
+_GPU_KERNEL = None
+
+
+def _get_count_kernel():
+    """Lazily create the shared mismatch-count CUDA kernel (once).
+
+    One thread per window start counts ACGT-code mismatches against the
+    guide; used for BOTH strands by passing the forward guide codes for
+    '+' and the reverse-complement guide codes for '-'. Compiled once
+    per process — the previous per-chunk ``@cuda.jit`` definitions were
+    recompiled for every chunk.
+    """
+    global _GPU_KERNEL
+    if _GPU_KERNEL is not None:
+        return _GPU_KERNEL
+    from numba import cuda  # type: ignore
+
+    @cuda.jit
+    def _count_mm_kernel(seq_u8, guide_u8, starts, n_starts, mm_out):
+        """One thread per start position; counts ACGT mismatches."""
+        t = cuda.grid(1)
+        if t >= n_starts:
+            return
+        i = starts[t]
+        L = guide_u8.shape[0]
+        cnt = 0
+        for k in range(L):
+            g = guide_u8[k]
+            w = seq_u8[i + k]
+            # code 4 (ambiguous) never equals a guide code
+            if g != w:
+                cnt += 1
+        mm_out[t] = cnt
+
+    _GPU_KERNEL = _count_mm_kernel
+    return _GPU_KERNEL
+
+
 def _numba_scan(
     records: list[FastaRecord],
     guide: str,
@@ -346,27 +391,15 @@ def _numba_scan(
     # Kernel-launch occupancy warnings are noise for batch scans.
     warnings.filterwarnings("ignore", category=NumbaPerformanceWarning)
 
-    from .aligner import _mismatch_positions, _pam_matches, deduplicate, revcomp
     from .chunking import chunk_records, total_chunks
 
+    guide = validate_guide(guide)
+    records = list(records)
+    validate_overlap(records, guide, chunk_size, overlap, pam_patterns)
+    patterns = ["".join(p.split()).upper() for p in pam_patterns]
+    strand_set, pam_len = _validate_scan_args(patterns, strands)
+    L = len(guide)
     guide_rc = revcomp(guide)
-
-    @cuda.jit
-    def _count_mm_kernel(seq_u8, guide_u8, starts, n_starts, mm_out):
-        """One thread per start position; counts ACGT mismatches."""
-        t = cuda.grid(1)
-        if t >= n_starts:
-            return
-        i = starts[t]
-        L = guide_u8.shape[0]
-        cnt = 0
-        for k in range(L):
-            g = guide_u8[k]
-            w = seq_u8[i + k]
-            # code 4 (ambiguous) never equals a guide code
-            if g != w:
-                cnt += 1
-        mm_out[t] = cnt
 
     guide_u8 = np.frombuffer(guide.encode("ascii"), dtype=np.uint8)
     # map ascii to 0..3 for kernel speed
@@ -378,10 +411,10 @@ def _numba_scan(
     guide_codes = lut[guide_u8].astype(np.uint8)
     guide_rc_codes = lut[np.frombuffer(guide_rc.encode("ascii"),
                                       dtype=np.uint8)].astype(np.uint8)
-
-    patterns = ["".join(p.split()).upper() for p in pam_patterns]
-    strand_set = set(strands)
-    L = len(guide)
+    d_guide_plus = cuda.to_device(guide_codes)
+    d_guide_minus = cuda.to_device(guide_rc_codes)
+    kernel = _get_count_kernel()
+    threads = 256
 
     all_candidates: list[Candidate] = []
     stats = ScanStats()
@@ -398,113 +431,80 @@ def _numba_scan(
                                       dtype=np.uint8)].astype(np.uint8)
         d_seq = cuda.to_device(seq_codes)
 
-        pam_len = len(patterns[0]) if patterns else 0
-        tasks: list[tuple[int, "object", bool]] = []  # (start, guide_arr, is_plus)
-        for i in range(0, n - L + 1):
-            if "+" in strand_set and i + L + pam_len <= n:
-                tasks.append((i, guide_codes, True))
-            if "-" in strand_set and i >= pam_len:
-                # minus-strand window compare uses revcomp of window;
-                # equivalent to comparing guide_rc against seq[i:i+L]
-                # read in reverse -- handled by dedicated kernel below.
-                pass
+        # Window starts are contiguous ranges, so np.arange replaces the
+        # previous O(n) Python task-list construction entirely.
+        #   '+' : i in [0, n-L-pam_len]          (protospacer + PAM fit)
+        #   '-' : i in [pam_len, n-L]            (PAM before protospacer)
+        # Both ranges have the same length nwin = n-L-pam_len+1.
+        nwin = max(0, n - L - pam_len + 1)
 
-        # '+' strand kernel
-        if tasks:
-            starts = np.array([t[0] for t in tasks], dtype=np.int64)
-            mm = np.empty(len(tasks), dtype=np.int32)
+        def _launch(guide_dev, i_lo: int, i_hi: int):
+            """Run the count kernel; return (starts, mm_counts) on host."""
+            nw = i_hi - i_lo + 1
+            if nw <= 0:
+                return None, None
+            starts = np.arange(i_lo, i_hi + 1, dtype=np.int64)
+            mm = np.empty(nw, dtype=np.int32)
             d_starts = cuda.to_device(starts)
             d_mm = cuda.to_device(mm)
-            threads = 256
-            blocks = (len(tasks) + threads - 1) // threads
-            _count_mm_kernel[blocks, threads](d_seq, guide_codes,
-                                              d_starts, len(tasks), d_mm)
-            mm = d_mm.copy_to_host()
-            stats.windows_evaluated += len(tasks)
-            for (i, _g, _p), m in zip(tasks, mm):
-                # The kernel is an ACGT-exact pre-filter; every surviving
-                # window is re-verified with the exact IUPAC semantics so
-                # reported mismatches/positions always match the CPU path.
-                if m > max_mismatches:
-                    continue
-                window = seq[i : i + L]
-                mm_pos = _mismatch_positions(guide, window)
-                if len(mm_pos) > max_mismatches:
-                    continue
-                pam = seq[i + L : i + L + pam_len]
-                compat = _pam_matches(pam, patterns)
-                if compat or not require_pam:
-                    stats.candidates_found += 1
-                    all_candidates.append(Candidate(
-                        chromosome=chunk.chromosome,
-                        start=chunk.start + i,
-                        end=chunk.start + i + L,
-                        strand="+",
-                        mismatches=len(mm_pos),
-                        mismatch_positions=mm_pos,
-                        pam=pam,
-                        pam_compatible=compat,
-                        guide=guide,
-                    ))
+            blocks = (nw + threads - 1) // threads
+            kernel[blocks, threads](d_seq, guide_dev, d_starts, nw, d_mm)
+            return starts, d_mm.copy_to_host()
 
-        # '-' strand: compare guide reverse-complement against the window
-        # in reverse order. Implement by scanning reversed guide against
-        # forward window: mm(window_revcomp, guide) ==
-        # mm(rev(window), revcomp-ish) -- simplest correct approach is a
-        # second kernel indexing seq from the right.
-        minus_tasks = [i for i in range(0, n - L + 1)
-                       if "-" in strand_set and i >= pam_len]
-        if minus_tasks:
-            starts = np.array(minus_tasks, dtype=np.int64)
-            mm = np.empty(len(minus_tasks), dtype=np.int32)
-            d_starts = cuda.to_device(starts)
-            d_mm = cuda.to_device(mm)
+        if "+" in strand_set:
+            stats.windows_evaluated += nwin
+            starts, mm = _launch(d_guide_plus, 0, nwin - 1)
+            if starts is not None:
+                # Only surviving windows are re-verified on CPU with the
+                # exact IUPAC semantics (positions + strand PAM string).
+                for j in np.flatnonzero(mm <= max_mismatches):
+                    i = int(starts[j])
+                    window = seq[i : i + L]
+                    mm_pos = _mismatch_positions(guide, window)
+                    if len(mm_pos) > max_mismatches:
+                        continue
+                    pam = seq[i + L : i + L + pam_len]
+                    compat = _pam_matches(pam, patterns)
+                    if compat or not require_pam:
+                        stats.candidates_found += 1
+                        all_candidates.append(Candidate(
+                            chromosome=chunk.chromosome,
+                            start=chunk.start + i,
+                            end=chunk.start + i + L,
+                            strand="+",
+                            mismatches=len(mm_pos),
+                            mismatch_positions=mm_pos,
+                            pam=pam,
+                            pam_compatible=compat,
+                            guide=guide,
+                        ))
 
-            @cuda.jit
-            def _count_mm_minus(seq_u8, guide_rc_u8, starts, n_starts, mm_out):
-                t = cuda.grid(1)
-                if t >= n_starts:
-                    return
-                i = starts[t]
-                Lg = guide_rc_u8.shape[0]
-                cnt = 0
-                for k in range(Lg):
-                    # guide_rc == revcomp(guide); a minus-strand window
-                    # matches iff window[k] == guide_rc[k] for all k.
-                    g = guide_rc_u8[k]
-                    w = seq_u8[i + k]
-                    if g != w:
-                        cnt += 1
-                mm_out[t] = cnt
-
-            threads = 256
-            blocks = (len(minus_tasks) + threads - 1) // threads
-            _count_mm_minus[blocks, threads](d_seq, guide_rc_codes,
-                                             d_starts, len(minus_tasks), d_mm)
-            mm = d_mm.copy_to_host()
-            stats.windows_evaluated += len(minus_tasks)
-            for i, m in zip(minus_tasks, mm):
-                if m > max_mismatches:
-                    continue
-                window_rc = revcomp(seq[i : i + L])
-                mm_pos = _mismatch_positions(guide, window_rc)
-                if len(mm_pos) > max_mismatches:
-                    continue
-                pam = revcomp(seq[i - pam_len : i])
-                compat = _pam_matches(pam, patterns)
-                if compat or not require_pam:
-                    stats.candidates_found += 1
-                    all_candidates.append(Candidate(
-                        chromosome=chunk.chromosome,
-                        start=chunk.start + i,
-                        end=chunk.start + i + L,
-                        strand="-",
-                        mismatches=len(mm_pos),
-                        mismatch_positions=mm_pos,
-                        pam=pam,
-                        pam_compatible=compat,
-                        guide=guide,
-                    ))
+        if "-" in strand_set:
+            stats.windows_evaluated += nwin
+            starts, mm = _launch(d_guide_minus, pam_len,
+                                 pam_len + nwin - 1)
+            if starts is not None:
+                for j in np.flatnonzero(mm <= max_mismatches):
+                    i = int(starts[j])
+                    window_rc = revcomp(seq[i : i + L])
+                    mm_pos = _mismatch_positions(guide, window_rc)
+                    if len(mm_pos) > max_mismatches:
+                        continue
+                    pam = revcomp(seq[i - pam_len : i])
+                    compat = _pam_matches(pam, patterns)
+                    if compat or not require_pam:
+                        stats.candidates_found += 1
+                        all_candidates.append(Candidate(
+                            chromosome=chunk.chromosome,
+                            start=chunk.start + i,
+                            end=chunk.start + i + L,
+                            strand="-",
+                            mismatches=len(mm_pos),
+                            mismatch_positions=mm_pos,
+                            pam=pam,
+                            pam_compatible=compat,
+                            guide=guide,
+                        ))
 
         del d_seq
         done_chunks += 1

@@ -19,6 +19,7 @@ from __future__ import annotations
 import sys
 import types
 import warnings
+from collections import Counter
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -193,13 +194,18 @@ def compute_stats(records: list[FastaRecord]) -> SequenceStats:
     ambiguous = 0
 
     for rec in records:
-        rc = {"id": rec.record_id, "length": rec.length, "gc_percent": 0.0}
-        local_counts: dict[str, int] = {}
-        for base in rec.sequence:
-            local_counts[base] = local_counts.get(base, 0) + 1
-            counts[base] = counts.get(base, 0) + 1
+        # Counter is implemented in C; a per-base Python loop here was the
+        # dominant cost when loading chromosome-scale FASTA files.
+        local_counts = Counter(rec.sequence)
+        for base, n_base in local_counts.items():
+            counts[base] = counts.get(base, 0) + n_base
             if base not in "ACGT":
-                ambiguous += 1
+                ambiguous += n_base
+        rc = {
+            "id": rec.record_id,
+            "length": rec.length,
+            "gc_percent": 0.0,
+        }
         if rec.length:
             rc["gc_percent"] = round(
                 100.0 * (local_counts.get("G", 0) + local_counts.get("C", 0)) / rec.length, 4

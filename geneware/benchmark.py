@@ -39,6 +39,7 @@ class BenchmarkResult:
     chunks_scanned: int
     memory_peak_bytes: int | None
     notes: list[str] = field(default_factory=list)
+    backend: str = "cpu"  # execution backend that produced this run
 
     @property
     def total_seconds(self) -> float:
@@ -73,10 +74,12 @@ class BenchmarkResult:
             "throughput_windows_per_sec": self.throughput_windows_per_sec,
             "memory_peak_bytes": self.memory_peak_bytes,
             "notes": self.notes,
+            "backend": self.backend,
         }
 
 
-def _format_bytes(n: int | None) -> str:
+def format_bytes(n: int | None) -> str:
+    """Human-readable byte count (``None`` -> ``'n/a'``)."""
     if n is None:
         return "n/a"
     for unit in ("B", "KiB", "MiB", "GiB"):
@@ -86,10 +89,13 @@ def _format_bytes(n: int | None) -> str:
     return f"{n} B"
 
 
+_format_bytes = format_bytes
+
+
 def format_result(r: BenchmarkResult) -> str:
     """Human-readable summary of a benchmark result."""
     lines = [
-        "GeneWeaver benchmark (CPU baseline)",
+        f"GeneWeaver benchmark ({r.backend} backend)",
         f"  input          : {r.fasta_path}",
         f"  guide          : {r.guide}",
         f"  parse time     : {r.parse_ns / 1e9:.6f} s",

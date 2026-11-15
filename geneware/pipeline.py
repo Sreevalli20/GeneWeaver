@@ -30,6 +30,7 @@ from .aligner import (
     scan_records,
 )
 from .benchmark import BenchmarkResult
+from .chunking import total_chunks
 from .fasta import FastaParseError, FastaRecord, compute_stats, iter_fasta
 from .scoring import ScoredCandidate, score_candidates, score_summary
 
@@ -102,9 +103,13 @@ def _scan_for_backend(
         pam_patterns=pam_patterns, strands=strands,
         max_mismatches=max_mismatches, require_pam=require_pam,
     )
+    n_chunks = total_chunks(records, chunk_size, overlap)
     if backend == "cpu":
         cands, stats = scan_records(records, guide, progress=progress, **kwargs)
-        return cands, stats, {"workers": 1, "mode": "sequential"}
+        return cands, stats, {
+            "workers": 1, "mode": "sequential",
+            "chunks_total": n_chunks, "chunks_completed": stats.chunks_scanned,
+        }
     if backend == "gpu":
         from .gpu import detect_gpu, scan_gpu
         status = detect_gpu()
@@ -113,7 +118,10 @@ def _scan_for_backend(
                 "GPU backend requested but unavailable: " + status.reason
             )
         cands, stats = scan_gpu(records, guide, progress=progress, **kwargs)
-        return cands, stats, {"gpu": status.to_dict()}
+        return cands, stats, {
+            "gpu": status.to_dict(),
+            "chunks_total": n_chunks, "chunks_completed": stats.chunks_scanned,
+        }
     if backend == "dask":
         from .dask_engine import scan_records_dask
         result = scan_records_dask(
@@ -124,6 +132,7 @@ def _scan_for_backend(
             "dask_backend": result.backend,
             "chunks_total": result.chunks_total,
             "chunks_completed": result.chunks_completed,
+            "chunks_pending": result.chunks_pending,
             "tasks_failed": result.tasks_failed,
             "errors": result.errors,
         }
@@ -159,16 +168,39 @@ def run_analysis(
         records = list(iter_fasta(fasta_path))
     seq_stats = compute_stats(records).to_dict()
 
+    # Measure real peak Python memory for the scan when tracemalloc is
+    # not already running (run_benchmark starts its own trace, in which
+    # case the benchmark-level peak is the authoritative measurement).
+    tracing_here = False
+    if not tracemalloc.is_tracing():
+        try:
+            tracemalloc.start()
+            tracing_here = True
+        except Exception:
+            pass
+
     t0 = time.perf_counter()
-    cands, stats, extra = _scan_for_backend(
-        backend, records, guide,
-        chunk_size=chunk_size, overlap=overlap,
-        pam_patterns=pams, strands=strand_tuple,
-        max_mismatches=max_mismatches, require_pam=require_pam,
-        n_workers=n_workers, processes=processes, client=client,
-        progress=progress,
-    )
+    try:
+        cands, stats, extra = _scan_for_backend(
+            backend, records, guide,
+            chunk_size=chunk_size, overlap=overlap,
+            pam_patterns=pams, strands=strand_tuple,
+            max_mismatches=max_mismatches, require_pam=require_pam,
+            n_workers=n_workers, processes=processes, client=client,
+            progress=progress,
+        )
+    except MemoryError as exc:
+        raise AnalysisError(
+            f"out of memory during '{backend}' scan: {exc}. "
+            "Try a smaller --chunk-size or fewer/smaller input records."
+        ) from exc
+    finally:
+        mem_peak = None
+        if tracing_here:
+            _, mem_peak = tracemalloc.get_traced_memory()
+            tracemalloc.stop()
     elapsed = time.perf_counter() - t0
+    extra["memory_peak_bytes"] = mem_peak
 
     scored = score_candidates(cands)
     return AnalysisResult(
@@ -246,6 +278,7 @@ def run_benchmark(
     result = BenchmarkResult(
         fasta_path=str(fasta_path),
         guide=guide,
+        backend=backend,
         parse_ns=t_parse,
         align_ns=t_align,
         total_ns=t_total,

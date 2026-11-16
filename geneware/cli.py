@@ -5,7 +5,7 @@ Subcommands:
     scan        - run the sequential CPU alignment scan (Week 1 baseline)
     bench       - timed CPU baseline benchmark
     analyze     - full pipeline (cpu|gpu|dask backend) with scoring
-    report      - run analysis and export CSV/JSON/HTML reports
+    report      - run analysis and export CSV/JSON/HTML/PDF reports
     gpu-status  - probe GPU/CUDA availability and print requirements
 """
 
@@ -239,7 +239,7 @@ def build_parser() -> argparse.ArgumentParser:
     _add_backend(p_an)
     p_an.set_defaults(func=cmd_analyze)
 
-    p_rep = sub.add_parser("report", help="analysis + CSV/JSON/HTML export")
+    p_rep = sub.add_parser("report", help="analysis + CSV/JSON/HTML/PDF export")
     p_rep.add_argument("fasta", help="path to FASTA file")
     p_rep.add_argument("--guide", required=True, help="guide spacer sequence")
     p_rep.add_argument("--out-dir", default="reports",

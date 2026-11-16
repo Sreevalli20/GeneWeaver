@@ -31,12 +31,15 @@ from typing import Any
 from .aligner import (
     DEFAULT_PAM_PATTERNS,
     DEFAULT_STRANDS,
+    AlignError,
     Candidate,
     ScanStats,
     deduplicate,
     scan_chunk,
     validate_guide,
     validate_overlap,
+    _normalise_patterns,
+    _validate_scan_args,
 )
 from .chunking import chunk_records, total_chunks
 from .fasta import FastaRecord
@@ -164,8 +167,11 @@ def scan_records_dask(
     guide = validate_guide(guide)
     records = list(records)
     validate_overlap(records, guide, chunk_size, overlap, pam_patterns)
-    pams = tuple("".join(p.split()).upper() for p in pam_patterns)
+    pams = tuple(_normalise_patterns(pam_patterns))
     strand_tuple = tuple(strands)
+    _validate_scan_args(pams, strand_tuple)
+    if max_mismatches < 0:
+        raise AlignError(f"max_mismatches must be >= 0, got {max_mismatches}")
 
     n_total = total_chunks(records, chunk_size, overlap)
 
@@ -237,6 +243,7 @@ def scan_records_dask(
             client.close()
 
     unique = deduplicate(all_candidates)
+    unique.sort(key=lambda c: (c.chromosome, c.start, c.end, c.strand))
     stats.candidates_found = len(unique)
     return DaskScanResult(
         candidates=unique,

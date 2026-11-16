@@ -245,6 +245,29 @@ class Candidate:
     pam: str              # PAM as read on the candidate strand (5'->3')
     pam_compatible: bool
     guide: str            # the guide used (5'->3')
+    matched_sequence: str = ""      # protospacer in guide/candidate orientation
+    genomic_sequence: str = ""      # protospacer on the plus strand
+    ambiguous_positions: tuple[int, ...] = ()
+
+    @property
+    def pam_start(self) -> int:
+        """0-based plus-strand start of the PAM footprint."""
+        return self.end if self.strand == "+" else max(0, self.start - len(self.pam))
+
+    @property
+    def pam_end(self) -> int:
+        """0-based exclusive plus-strand end of the PAM footprint."""
+        return self.pam_start + len(self.pam)
+
+    @property
+    def match_type(self) -> str:
+        """'exact' only for an unambiguous zero-mismatch alignment."""
+        ambiguous = self.ambiguous_positions
+        if not ambiguous and self.matched_sequence:
+            ambiguous = _ambiguous_positions(
+                self.guide, self.matched_sequence, self.mismatch_positions
+            )
+        return "exact" if self.mismatches == 0 and not ambiguous else "near"
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -257,6 +280,12 @@ class Candidate:
             "pam": self.pam,
             "pam_compatible": self.pam_compatible,
             "guide": self.guide,
+            "matched_sequence": self.matched_sequence,
+            "genomic_sequence": self.genomic_sequence,
+            "ambiguous_positions": list(self.ambiguous_positions),
+            "pam_start": self.pam_start,
+            "pam_end": self.pam_end,
+            "match_type": self.match_type,
         }
 
 
@@ -285,8 +314,31 @@ def _mismatch_positions(guide: str, window: str) -> tuple[int, ...]:
     )
 
 
+def _ambiguous_positions(
+    guide: str, window: str, mismatch_positions: tuple[int, ...]
+) -> tuple[int, ...]:
+    """Compatible positions containing IUPAC ambiguity on either side."""
+    mismatched = set(mismatch_positions)
+    return tuple(
+        i for i, (g, w) in enumerate(zip(guide, window, strict=True))
+        if i not in mismatched and (g not in "ACGT" or w not in "ACGT")
+    )
+
+
 def _normalise_patterns(pam_patterns: Iterable[str]) -> list[str]:
-    return ["".join(p.split()).upper() for p in pam_patterns]
+    patterns: list[str] = []
+    for raw in pam_patterns:
+        pat = "".join(str(raw).split()).upper()
+        if not pat:
+            raise AlignError("PAM pattern must not be empty")
+        bad = sorted({c for c in pat if c not in IUPAC_DNA})
+        if bad:
+            raise AlignError(
+                f"PAM pattern {pat!r} contains invalid nucleotide "
+                f"character(s) {bad!r} (expected IUPAC DNA alphabet)"
+            )
+        patterns.append(pat)
+    return patterns
 
 
 def _validate_scan_args(
@@ -296,6 +348,8 @@ def _validate_scan_args(
     strand_set = set(strands)
     if not strand_set <= {"+", "-"}:
         raise AlignError(f"invalid strand(s) in {strand_set!r}; use '+' and/or '-'")
+    if not patterns:
+        raise AlignError("at least one PAM pattern is required")
     pam_lens = {len(p) for p in patterns}
     if len(pam_lens) > 1:
         raise AlignError(
@@ -358,15 +412,17 @@ def _eval_hit(
     PAM string — the fast paths only pre-filter on mismatch *count*.
     """
     L = len(guide)
+    genomic_window = seq[i : i + L]
     if strand == "+":
-        window = seq[i : i + L]
+        matched = genomic_window
         pam = seq[i + L : i + L + pam_len]
     else:
-        window = revcomp(seq[i : i + L])
+        matched = revcomp(genomic_window)
         pam = revcomp(seq[i - pam_len : i])
-    mm_pos = _mismatch_positions(guide, window)
+    mm_pos = _mismatch_positions(guide, matched)
     if len(mm_pos) > max_mismatches:
         return None
+    amb_pos = _ambiguous_positions(guide, matched, mm_pos)
     compat = _pam_matches(pam, patterns)
     if not compat and require_pam:
         return None
@@ -380,6 +436,9 @@ def _eval_hit(
         pam=pam,
         pam_compatible=compat,
         guide=guide,
+        matched_sequence=matched,
+        genomic_sequence=genomic_window,
+        ambiguous_positions=amb_pos,
     )
 
 
@@ -516,6 +575,8 @@ def scan_chunk(
         stats = ScanStats()
     patterns = _normalise_patterns(pam_patterns)
     strand_set, pam_len = _validate_scan_args(patterns, strands)
+    if max_mismatches < 0:
+        raise AlignError(f"max_mismatches must be >= 0, got {max_mismatches}")
 
     seq = chunk.sequence
     n = len(seq)
@@ -573,7 +634,12 @@ def scan_records(
     """
     guide = validate_guide(guide)
     records = list(records)
-    validate_overlap(records, guide, chunk_size, overlap, pam_patterns)
+    patterns = _normalise_patterns(pam_patterns)
+    strands = tuple(strands)
+    _validate_scan_args(patterns, strands)
+    if max_mismatches < 0:
+        raise AlignError(f"max_mismatches must be >= 0, got {max_mismatches}")
+    validate_overlap(records, guide, chunk_size, overlap, patterns)
     n_chunks = total_chunks(records, chunk_size, overlap)
 
     stats = ScanStats()
@@ -584,7 +650,7 @@ def scan_records(
         for cand in scan_chunk(
             chunk,
             guide,
-            pam_patterns=pam_patterns,
+            pam_patterns=patterns,
             strands=strands,
             max_mismatches=max_mismatches,
             require_pam=require_pam,

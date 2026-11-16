@@ -34,6 +34,7 @@ measured benchmarks and exportable reports.
 | biopython    | 1.88   | `Bio.SeqIO` needs the documented AlignIO shim (WDAC blocks `Bio.Align._codonaligner`); FASTA parsing unaffected |
 | numpy        | 2.5.4  | upgraded from 1.26.4 (no cp314 wheel) |
 | textual      | 8.2.8  | terminal dashboard |
+| reportlab    | 4.2.5  | PDF report export |
 | dask         | 2024.12.1 | distributed CPU chunk processing |
 | distributed  | 2024.12.1 | LocalCluster backend |
 | numba        | 0.68.1 | GPU backend — works on this machine |
@@ -52,14 +53,15 @@ geneware/
   aligner.py       CPU protospacer/PAM scanner — numba-JIT engine with
                    encoded IUPAC table + pure-Python fallback
   scoring.py       experimental off-target ranking score (heuristic-v1)
+  alignment_view.py shared real-sequence alignment views for UI/reports
   gpu.py           GPU detection (numba.cuda / cupy) + CUDA kernel path
   dask_engine.py   Dask-distributed chunk processing + worker status
   pipeline.py      unified backend dispatcher + timed benchmarks
   benchmark.py     real timing/throughput/memory measurements
-  reports.py       CSV / JSON / HTML report export
+  reports.py       CSV / JSON / HTML / PDF report export
   app.py           Textual dashboard — 10 functional tabs
   cli.py           argparse CLI (parse/scan/bench/analyze/report/gpu-status)
-tests/             pytest suite (102 tests)
+tests/             pytest suite (111 tests)
 data/example.fasta small synthetic demo genome (test fixture)
 data/bench_20mb.fasta 20 Mbp synthetic benchmark genome (3 records,
                    90 planted guide+PAM hits)
@@ -84,7 +86,17 @@ pytest.ini         pytest-asyncio configuration
   (default `NGG`, Cas9 geometry, PAM-proximal to protospacer).
 * Configurable max mismatches; mismatch positions recorded.
 * 0-based half-open `[start, end)` coordinates on the plus strand.
-* Chunk-overlap deduplication (key: chr/start/end/strand).
+* PAM footprint coordinates (`pam_start`/`pam_end`) are reported in
+  plus-strand coordinates for both candidate strands.
+* Every candidate stores the real `matched_sequence` (guide/candidate
+  orientation), `genomic_sequence` (plus strand), and
+  `ambiguous_positions` for compatible IUPAC ambiguity.
+* `match_type` is `exact` only for an unambiguous zero-mismatch hit;
+  all other hits are labelled `near`.
+* Chunk-overlap deduplication (key: chr/start/end/strand) and
+  deterministic candidate ordering for repeatable reports.
+* PAM patterns are validated as non-empty, equal-length IUPAC strings;
+  invalid characters and empty pattern lists raise `AlignError`.
 * **Day-4 CPU engine:** bases are encoded to 4-bit IUPAC codes and the
   per-window scan runs as table lookups. When `numba` imports, an
   `@njit(nogil=True)` kernel counts mismatches with early exit at
@@ -100,9 +112,11 @@ pytest.ini         pytest-asyncio configuration
 * Experimental heuristic `geneware-heuristic-v1`, clearly labelled as
   **not** a validated biological prediction:
   `score = 100 − 10·mismatches − 5·(mismatches in last 8 protospacer
-  positions) − 15·(PAM incompatible)`, clamped to [0, 100].
-* Seed-region (PAM-proximal) mismatches cost extra. Full formula shown
-  in the UI and every exported report.
+  positions) − 15·(PAM incompatible) − 2·(compatible IUPAC-ambiguous
+  positions)`, clamped to [0, 100].
+* Seed-region (PAM-proximal) mismatches cost extra; compatible ambiguity
+  lowers confidence without being counted as a mismatch. `score_breakdown`
+  exposes every penalty component for the selected candidate and reports.
 
 ### GPU acceleration (`gpu.py`) — verified working on this laptop
 * Real detection probe: `numba.cuda` first, `cupy` second; reports
@@ -143,11 +157,14 @@ pytest.ini         pytest-asyncio configuration
 2. **Genome** — load FASTA or example, record table, real stats.
 3. **Analyzer** — guide, PAM, strand, max mismatches, require-PAM,
    backend select, workers, progress bar, analyze.
-4. **Results** — metrics line (sequences, bases, windows, matches,
-   mismatches, backend, elapsed), sortable DataTable (click headers to
-   sort, click again to reverse), min-score/chromosome/strand/PAM/coordinate
-   search filters, quick CSV/JSON/HTML export, explicit empty-state
-   message when nothing matches.
+4. **Results** — guide/PAM/settings summary, metrics line (sequences,
+   bases, windows, matches, mismatches, method, elapsed), sortable
+   DataTable with score/type/coordinates/strand/MM positions/ambiguity/
+   PAM/matched sequence, min-score/max-mismatch/chromosome/strand/
+   PAM-compatibility/match-type/search filters, click-row candidate
+   detail with highlighted guide-vs-candidate alignment and score
+   breakdown, and working quick CSV/JSON/HTML/PDF export of the current
+   filtered view.
 5. **Scoring** — formula explanation + last-run score summary.
 6. **Performance** — GPU availability probe, benchmark runner for
    cpu/gpu/dask backends, and a "last run" panel showing method,
@@ -155,7 +172,7 @@ pytest.ini         pytest-asyncio configuration
    peak Python memory, and candidate counts.
 7. **Dask** — real scheduler status + one-click Dask analysis.
 8. **Benchmarks** — comparison table of every recorded run.
-9. **Reports** — write CSV/JSON/HTML/bundle to the configured dir.
+9. **Reports** — write CSV/JSON/HTML/PDF/bundle to the configured dir.
 10. **Settings** — chunk size, overlap, workers, processes, out dir.
 
 ### Benchmarking (`benchmark.py`, `pipeline.py`)
@@ -185,9 +202,13 @@ All backends returned identical candidate sets on this input. First
 numba scan in a process includes ~1-2 s of JIT compilation.
 
 ### Reports (`reports.py`)
-* CSV (ranked candidates), JSON (full settings + stats + candidates),
-  self-contained HTML (inline CSS, no external assets). Every report
-  embeds guide, PAM, mismatch threshold, strands, backend, timings.
+* CSV (metadata columns plus ranked candidate details), JSON (full
+  settings, timings, stats, score formula, and candidates), self-contained
+  HTML (inline CSS, candidate summary plus expandable per-candidate
+  metadata and highlighted alignments), and PDF via ReportLab.
+* Every report embeds FASTA filename, guide, PAM configuration, strand
+  and mismatch settings, processing backend/method, preprocess/scan/total
+  times, sequence/candidate counts, score model, and score formula.
 
 ## Installation
 
@@ -234,26 +255,33 @@ Common options: `--chunk-size`, `--overlap`, `--pam`, `--strand`,
 python -m pytest tests -q
 ```
 
-102 tests cover: FASTA parsing edge cases, chunk boundaries, both
-strands, PAM matching, mismatch positions, deduplication, scoring
-formula/ranking, GPU detection contract + CPU fallback + real GPU
-execution parity with CPU (skipped automatically when no GPU backend
-is usable), numba-vs-Python engine parity, overlap validation,
-multi-record/large-FASTA scans, compute_stats correctness, dask
-scan equality with sequential results + pending/completed tracking,
-report generation, pipeline backends + memory-error surfacing,
-benchmark backend field, and Textual app smoke tests (tab mounting,
-genome load, full CPU analysis, results metrics, filtering empty
-state).
+111 tests cover: FASTA parsing edge cases, chunk boundaries, both
+strands, PAM matching/validation, mismatch and ambiguity positions,
+matched/genomic sequence provenance, exact-vs-near typing, deduplication,
+scoring formula/breakdown/ranking, GPU detection contract + CPU fallback
+and real GPU execution parity with CPU (skipped automatically when no GPU
+backend is usable), numba-vs-Python engine parity, overlap validation,
+multi-record/large-FASTA scans, compute_stats correctness, dask scan
+equality with sequential results + pending/completed tracking, CSV/JSON/
+HTML/PDF report generation and contents, pipeline backends +
+memory-error surfacing, benchmark backend field, and Textual app smoke
+tests (tab mounting, genome load, full CPU analysis, results metrics,
+filtering, sorting, candidate detail, quick export, and empty state).
 
 ## Coordinate & matching conventions
 
 * Coordinates: 0-based, half-open `[start, end)` on the plus strand of
   each FASTA record (`record_id` = chromosome).
-* `-` strand candidates match the reverse complement of `[start, end)`.
+* `-` strand candidates match the reverse complement of `[start, end)`;
+  `matched_sequence` is always in guide/candidate orientation while
+  `genomic_sequence` remains plus-strand.
 * PAM = 3 bases immediately 3' of the protospacer **on the candidate
-  strand**; edge windows that can't fit protospacer+PAM are skipped.
-* IUPAC-aware matching throughout; ambiguous bases preserved.
+  strand**; `pam_start`/`pam_end` give its plus-strand footprint.
+  Edge windows that can't fit protospacer+PAM are skipped.
+* `match_type=exact` requires zero mismatches and no compatible IUPAC
+  ambiguity; otherwise the candidate is `near`.
+* IUPAC-aware matching throughout; ambiguous bases preserved and reported
+  in `ambiguous_positions`.
 
 ## Known limitations
 
@@ -276,6 +304,12 @@ state).
 * **Dask threads are GIL-limited:** the njit kernel releases the GIL
   (`nogil=True`), but thread workers were still slower than processes
   in measurements — prefer `--workers N` (processes) for real speedup.
+* **Terminal exports write files:** the dashboard/CLI write CSV/JSON/
+  HTML/PDF reports to the configured output directory; there is no
+  browser download manager.
+* **`exact` is conservative:** any compatible IUPAC ambiguity makes a
+  zero-mismatch candidate `near`, because the base identity is not fully
+  resolved.
 * Whole-record sequences are held in memory (BioPython `SeqIO`
   semantics); chunking bounds *scan* memory but not *parse* memory.
   Very large genomes may need a streaming parser (not implemented).

@@ -76,7 +76,8 @@ def _pure_records():
 
 def _key(c):
     return (c.chromosome, c.start, c.end, c.strand, c.mismatches,
-            c.pam, c.pam_compatible, c.mismatch_positions)
+            c.pam, c.pam_compatible, c.mismatch_positions,
+            c.matched_sequence, c.genomic_sequence, c.ambiguous_positions)
 
 
 @pytest.mark.skipif(not gpu_available(), reason="no usable GPU backend")

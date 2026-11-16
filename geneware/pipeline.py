@@ -25,14 +25,21 @@ from typing import Any
 from .aligner import (
     DEFAULT_PAM_PATTERNS,
     DEFAULT_STRANDS,
+    AlignError,
     Candidate,
     ScanStats,
     scan_records,
+    validate_guide,
 )
 from .benchmark import BenchmarkResult
 from .chunking import total_chunks
 from .fasta import FastaParseError, FastaRecord, compute_stats, iter_fasta
-from .scoring import ScoredCandidate, score_candidates, score_summary
+from .scoring import (
+    ScoredCandidate,
+    score_candidates,
+    score_formula_text,
+    score_summary,
+)
 
 BACKENDS = ("cpu", "gpu", "dask")
 
@@ -61,6 +68,18 @@ class AnalysisResult:
     elapsed_seconds: float
     extra: dict[str, Any] = field(default_factory=dict)  # dask/gpu details
 
+    @property
+    def processing_method(self) -> str:
+        parts = [self.backend]
+        for key in ("mode", "dask_backend"):
+            value = self.extra.get(key)
+            if value and str(value) not in parts:
+                parts.append(str(value))
+        gpu = self.extra.get("gpu")
+        if isinstance(gpu, dict) and gpu.get("backend") and gpu["backend"] not in parts:
+            parts.append(str(gpu["backend"]))
+        return "/".join(parts)
+
     def analysis_dict(self) -> dict[str, Any]:
         """JSON-serialisable analysis payload for reports/exports."""
         return {
@@ -71,11 +90,19 @@ class AnalysisResult:
             "max_mismatches": self.max_mismatches,
             "require_pam": self.require_pam,
             "fasta_path": self.fasta_path,
+            "fasta_filename": Path(self.fasta_path).name,
             "elapsed_seconds": self.elapsed_seconds,
+            "processing_method": self.processing_method,
+            "sequences_processed": self.sequence_stats.get(
+                "record_count", len(self.records)
+            ),
+            "candidate_count": len(self.scored),
+            "matches_found": self.stats.candidates_found,
             "sequence_stats": self.sequence_stats,
             "scan_stats": self.stats.to_dict(),
             "score_summary": self.score_summary,
             "score_model": "geneware-heuristic-v1 (experimental, not validated)",
+            "score_formula": score_formula_text(),
             "extra": self.extra,
             "candidates": [s.to_dict() for s in self.scored],
         }
@@ -161,12 +188,17 @@ def run_analysis(
     if backend not in BACKENDS:
         raise AnalysisError(f"unknown backend {backend!r}; choose cpu|gpu|dask")
     fasta_path = Path(fasta_path)
+    guide = validate_guide(guide)
+    if max_mismatches < 0:
+        raise AlignError(f"max_mismatches must be >= 0, got {max_mismatches}")
     pams = tuple("".join(p.split()).upper() for p in pam_patterns)
     strand_tuple = tuple(strands)
 
+    t_pre = time.perf_counter()
     if records is None:
         records = list(iter_fasta(fasta_path))
     seq_stats = compute_stats(records).to_dict()
+    preprocess_seconds = time.perf_counter() - t_pre
 
     # Measure real peak Python memory for the scan when tracemalloc is
     # not already running (run_benchmark starts its own trace, in which
@@ -201,7 +233,10 @@ def run_analysis(
             tracemalloc.stop()
     elapsed = time.perf_counter() - t0
     extra["memory_peak_bytes"] = mem_peak
+    extra["preprocess_seconds"] = preprocess_seconds
+    extra["total_seconds"] = preprocess_seconds + elapsed
 
+    cands.sort(key=lambda c: (c.chromosome, c.start, c.end, c.strand))
     scored = score_candidates(cands)
     return AnalysisResult(
         backend=backend,
@@ -269,6 +304,8 @@ def run_benchmark(
     # analysis.elapsed_seconds is the scan-only wall time.
     t_align = int(analysis.elapsed_seconds * 1e9)
     t_total = time.perf_counter_ns() - t0
+    analysis.extra["preprocess_seconds"] = t_parse / 1e9
+    analysis.extra["total_seconds"] = t_total / 1e9
 
     _, peak = tracemalloc.get_traced_memory() if tracemalloc_started else (0, None)
     if tracemalloc_started:

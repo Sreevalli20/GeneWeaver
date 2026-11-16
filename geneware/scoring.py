@@ -19,6 +19,10 @@ Each candidate starts at 100 points and is penalised:
   Cas9 binding, so they cost more.
 * ``PAM_PENALTY`` (15 points) when the PAM is incompatible with every
   configured pattern (only possible when ``require_pam=False``).
+* ``AMBIGUITY_PENALTY`` (2 points) per compatible position where the
+  guide or candidate base is IUPAC-ambiguous (for example ``N``). Such a
+  position is not counted as a mismatch, but it is lower-confidence
+  evidence than an unambiguous A/C/G/T match.
 
 The final score is clamped to ``[0, 100]``. Higher is better. Ties are
 broken by fewer mismatches, then by genomic coordinate, for stable
@@ -33,12 +37,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .aligner import Candidate
+from .aligner import Candidate, _ambiguous_positions
 
 MISMATCH_PENALTY = 10.0
 SEED_PENALTY = 5.0
 SEED_LEN = 8
 PAM_PENALTY = 15.0
+AMBIGUITY_PENALTY = 2.0
 MAX_SCORE = 100.0
 
 
@@ -59,17 +64,49 @@ class ScoredCandidate:
 SCORE_MODEL_NAME = "geneware-heuristic-v1"
 
 
-def score_candidate(cand: Candidate) -> float:
-    """Compute the experimental score for one candidate (0-100)."""
+def _effective_ambiguous_positions(cand: Candidate) -> tuple[int, ...]:
+    """Stored ambiguity, or derive it when sequence data is present."""
+    if cand.ambiguous_positions:
+        return cand.ambiguous_positions
+    if cand.matched_sequence and len(cand.matched_sequence) == len(cand.guide):
+        return _ambiguous_positions(
+            cand.guide, cand.matched_sequence, cand.mismatch_positions
+        )
+    return ()
+
+
+def score_breakdown(cand: Candidate) -> dict[str, object]:
+    """Return the auditable components of a candidate's score."""
     L = len(cand.guide)
     seed_start = max(0, L - SEED_LEN)
     seed_mm = sum(1 for p in cand.mismatch_positions if p >= seed_start)
-    score = MAX_SCORE
-    score -= MISMATCH_PENALTY * cand.mismatches
-    score -= SEED_PENALTY * seed_mm
-    if not cand.pam_compatible:
-        score -= PAM_PENALTY
-    return max(0.0, score)
+    ambiguous_positions = _effective_ambiguous_positions(cand)
+    ambiguous = len(ambiguous_positions)
+    pam_penalty = 0.0 if cand.pam_compatible else PAM_PENALTY
+    raw = (
+        MAX_SCORE
+        - MISMATCH_PENALTY * cand.mismatches
+        - SEED_PENALTY * seed_mm
+        - pam_penalty
+        - AMBIGUITY_PENALTY * ambiguous
+    )
+    return {
+        "mismatches": cand.mismatches,
+        "mismatch_penalty": MISMATCH_PENALTY * cand.mismatches,
+        "seed_mismatches": seed_mm,
+        "seed_penalty": SEED_PENALTY * seed_mm,
+        "pam_compatible": cand.pam_compatible,
+        "pam_penalty": pam_penalty,
+        "ambiguous_positions": list(ambiguous_positions),
+        "ambiguity_penalty": AMBIGUITY_PENALTY * ambiguous,
+        "raw_score": raw,
+        "score": max(0.0, raw),
+    }
+
+
+def score_candidate(cand: Candidate) -> float:
+    """Compute the experimental score for one candidate (0-100)."""
+    return float(score_breakdown(cand)["score"])
 
 
 def score_candidates(candidates: list[Candidate]) -> list[ScoredCandidate]:
@@ -98,6 +135,8 @@ def score_formula_text() -> str:
         f"  - {SEED_PENALTY:.0f} extra per mismatch in the last "
         f"{SEED_LEN} protospacer positions (PAM-proximal seed region)\n"
         f"  - {PAM_PENALTY:.0f} if PAM incompatible with all patterns\n"
+        f"  - {AMBIGUITY_PENALTY:.0f} per compatible IUPAC-ambiguous "
+        "position\n"
         "  clamped to [0, 100]; higher is better."
     )
 

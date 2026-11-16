@@ -24,9 +24,10 @@ lists the requirements.
 from __future__ import annotations
 
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
+from rich.text import Text
 from textual import on, work
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical
@@ -47,13 +48,14 @@ from textual.widgets import (
 )
 
 from .aligner import AlignError, validate_guide
+from .alignment_view import alignment_segments, candidate_view
 from .benchmark import format_bytes, format_result
 from .dask_engine import dask_status
 from .fasta import FastaParseError, compute_stats, iter_fasta
 from .gpu import detect_gpu
 from .pipeline import AnalysisError, run_analysis
-from .reports import write_csv, write_html, write_json
-from .scoring import score_formula_text
+from .reports import write_csv, write_html, write_json, write_pdf
+from .scoring import score_breakdown, score_formula_text, score_summary
 
 EXAMPLE_FASTA = Path(__file__).resolve().parent.parent / "data" / "example.fasta"
 DEFAULT_OUT_DIR = Path("reports")
@@ -99,6 +101,7 @@ class GeneWeaverApp(App):
     .grid > * { width: 1fr; margin-right: 2; }
     .grid > *:last-child { margin-right: 0; }
     #genome-table, #results-table, #bench-table { height: 16; }
+    #results-detail { height: 12; border: solid $primary-darken-2; }
     #home-log, #analyzer-log, #perf-log { height: 10; border: solid $primary-darken-2; }
     .kv { color: $text-muted; }
     ProgressBar { margin: 1 0; }
@@ -114,26 +117,32 @@ class GeneWeaverApp(App):
     # column_key -> sort key function over ScoredCandidate
     _RESULT_SORT_KEYS = {
         "score": lambda sc: sc.score,
+        "type": lambda sc: (sc.candidate.match_type, sc.candidate.mismatches),
         "chr": lambda sc: sc.candidate.chromosome,
         "start": lambda sc: sc.candidate.start,
         "end": lambda sc: sc.candidate.end,
         "strand": lambda sc: sc.candidate.strand,
         "mm": lambda sc: sc.candidate.mismatches,
+        "mm_pos": lambda sc: sc.candidate.mismatch_positions,
+        "ambig": lambda sc: sc.candidate.ambiguous_positions,
         "pam": lambda sc: sc.candidate.pam,
         "pam_ok": lambda sc: int(sc.candidate.pam_compatible),
-        "mm_pos": lambda sc: sc.candidate.mismatch_positions,
+        "guide": lambda sc: sc.candidate.guide,
+        "match": lambda sc: sc.candidate.matched_sequence,
     }
 
     _RESULT_COLUMNS = [
-        ("Score", "score"), ("Chr", "chr"), ("Start", "start"),
-        ("End", "end"), ("Strand", "strand"), ("MM", "mm"),
-        ("PAM", "pam"), ("PAM ok", "pam_ok"), ("MM pos", "mm_pos"),
+        ("Score", "score"), ("Type", "type"), ("Chr", "chr"),
+        ("Start", "start"), ("End", "end"), ("Strand", "strand"),
+        ("MM", "mm"), ("MM pos", "mm_pos"), ("Ambig", "ambig"),
+        ("PAM", "pam"), ("PAM ok", "pam_ok"), ("Match", "match"),
     ]
 
     def __init__(self) -> None:
         super().__init__()
         self.state = AppState()
         self._visible_scored: list = []
+        self._displayed_scored: list = []
         self._sort_key: str | None = None
         self._sort_reverse: bool = False
 
@@ -229,20 +238,32 @@ class GeneWeaverApp(App):
         with TabPane("Results", id="tab-results"):
             with Horizontal():
                 yield Input(placeholder="min score (e.g. 80)", id="f-min-score")
+                yield Input(placeholder="max mismatches", id="f-max-mm")
                 yield Input(placeholder="chromosome filter", id="f-chrom")
-                yield Input(placeholder="search chr/PAM/strand/mm-pos",
+                yield Input(placeholder="search chr/PAM/strand/seq/coords",
                             id="f-search")
+            with Horizontal():
                 yield Select([("All strands", "all"), ("+", "+"), ("-", "-")],
                              value="all", allow_blank=False, id="f-strand")
+                yield Select([("All PAM", "all"), ("PAM ok", "yes"),
+                              ("PAM bad", "no")],
+                             value="all", allow_blank=False, id="f-pam")
+                yield Select([("All types", "all"), ("Exact", "exact"),
+                              ("Near", "near")],
+                             value="all", allow_blank=False, id="f-type")
                 yield Button("Apply filters", id="filter-btn", variant="primary")
                 yield Button("Clear", id="filter-clear")
+            yield Static("(run an analysis first)", id="results-guide")
             yield Static("(run an analysis first)", id="results-metrics")
             yield Static("(run an analysis first)", id="results-count")
             yield DataTable(id="results-table")
+            yield Label("Candidate detail / alignment", classes="section-label")
+            yield RichLog(id="results-detail", wrap=True, max_lines=14)
             with Horizontal():
                 yield Button("Export CSV", id="exp-csv")
                 yield Button("Export JSON", id="exp-json")
                 yield Button("Export HTML", id="exp-html")
+                yield Button("Export PDF", id="exp-pdf")
 
     def _scoring_tab(self) -> TabPane:
         with TabPane("Scoring", id="tab-scoring"):
@@ -289,6 +310,7 @@ class GeneWeaverApp(App):
                 yield Button("Write CSV", id="rep-csv", variant="primary")
                 yield Button("Write JSON", id="rep-json", variant="primary")
                 yield Button("Write HTML", id="rep-html", variant="primary")
+                yield Button("Write PDF", id="rep-pdf", variant="primary")
                 yield Button("Write all (bundle)", id="rep-bundle",
                              variant="success")
             yield Static("(nothing exported yet)", id="rep-out")
@@ -340,10 +362,14 @@ class GeneWeaverApp(App):
         return tuple(p for p in (s.strip() for s in raw.split(",")) if p) or ("NGG",)
 
     def _max_mm(self) -> int:
+        raw = self.query_one("#mm-input", Input).value.strip() or "0"
         try:
-            return max(0, int(self.query_one("#mm-input", Input).value.strip() or "0"))
-        except ValueError:
-            return 0
+            value = int(raw)
+        except ValueError as exc:
+            raise AlignError("max mismatches must be an integer") from exc
+        if value < 0:
+            raise AlignError("max mismatches must be >= 0")
+        return value
 
     def _require_pam(self) -> bool:
         return bool(self.query_one("#require-pam-check", Checkbox).value)
@@ -489,21 +515,25 @@ class GeneWeaverApp(App):
                 return
         try:
             guide = validate_guide(self._guide())
-        except AlignError as exc:
+            max_mm = self._max_mm()
+            pams = self._pam()
+            strands = self._strand_tuple()
+            require_pam = self._require_pam()
+            workers = int(self.query_one("#workers-input", Input).value or "2")
+        except (AlignError, ValueError) as exc:
             self._log("#analyzer-log", f"ERROR: {exc}")
             return
-        try:
-            workers = int(self.query_one("#workers-input", Input).value or "2")
-        except ValueError:
-            workers = 2
         self._analyze_worker(
             backend=backend, guide=guide, workers=workers,
+            pam_patterns=pams, strands=strands, max_mismatches=max_mm,
+            require_pam=require_pam,
             progress_bar="#analyze-progress" if backend != "dask"
             else "#dask-progress")
 
     @work(thread=True)
     def _analyze_worker(self, backend: str, guide: str, workers: int,
-                        progress_bar: str) -> None:
+                        pam_patterns, strands, max_mismatches: int,
+                        require_pam: bool, progress_bar: str) -> None:
         def progress(done: int, total: int) -> None:
             self.call_from_thread(self._set_progress, progress_bar, done, total)
 
@@ -512,10 +542,10 @@ class GeneWeaverApp(App):
                 self.state.fasta_path, guide, backend=backend,
                 chunk_size=self.state.chunk_size,
                 overlap=self.state.overlap,
-                pam_patterns=self._pam(),
-                strands=self._strand_tuple(),
-                max_mismatches=self._max_mm(),
-                require_pam=self._require_pam(),
+                pam_patterns=pam_patterns,
+                strands=strands,
+                max_mismatches=max_mismatches,
+                require_pam=require_pam,
                 n_workers=workers,
                 processes=self.state.use_processes,
                 records=self.state.records,
@@ -549,28 +579,36 @@ class GeneWeaverApp(App):
 
     def _fill_results(self, result) -> None:
         self._visible_scored = list(result.scored)
+        self._displayed_scored = []
         self._sort_key = None
         self._sort_reverse = False
         self._render_results()
         sstats = result.sequence_stats or {}
         scan = result.stats
         total_mm = sum(c.mismatches for c in result.candidates)
+        self.query_one("#results-guide", Static).update(
+            f"guide: {result.guide}  |  PAM: {', '.join(result.pam_patterns)}"
+            f"  |  max mismatches: {result.max_mismatches}"
+            f"  |  strands: {''.join(result.strands)}"
+            f"  |  require PAM: {'yes' if result.require_pam else 'no'}"
+        )
         self.query_one("#results-metrics", Static).update(
             f"sequences processed: {sstats.get('record_count', len(result.records))}"
             f"  |  total bases: {scan.bases_processed:,}"
             f"  |  windows evaluated: {scan.windows_evaluated:,}"
             f"  |  matches found: {scan.candidates_found:,}"
             f"  |  total mismatches: {total_mm:,}"
-            f"  |  backend: {result.backend}"
+            f"  |  method: {result.processing_method}"
             f"  |  elapsed: {result.elapsed_seconds:.3f}s"
         )
 
     def _render_results(self) -> None:
         """Render ``self._visible_scored`` into the results table."""
-        scored = self._visible_scored
+        scored = list(self._visible_scored)
         if self._sort_key in self._RESULT_SORT_KEYS:
             keyfn = self._RESULT_SORT_KEYS[self._sort_key]
             scored = sorted(scored, key=keyfn, reverse=self._sort_reverse)
+        self._displayed_scored = scored
         table = self.query_one("#results-table", DataTable)
         table.clear(columns=True)
         table.cursor_type = "row"
@@ -578,10 +616,12 @@ class GeneWeaverApp(App):
         for sc in scored:
             c = sc.candidate
             table.add_row(
-                f"{sc.score:.1f}", c.chromosome, str(c.start),
-                str(c.end), c.strand, str(c.mismatches), c.pam,
-                "yes" if c.pam_compatible else "no",
+                f"{sc.score:.1f}", c.match_type, c.chromosome,
+                str(c.start), str(c.end), c.strand, str(c.mismatches),
                 ",".join(map(str, c.mismatch_positions)) or "-",
+                ",".join(map(str, c.ambiguous_positions)) or "-",
+                c.pam, "yes" if c.pam_compatible else "no",
+                c.matched_sequence or "-",
             )
         analysis = self.state.analysis
         total = len(analysis.scored) if analysis is not None else 0
@@ -596,9 +636,10 @@ class GeneWeaverApp(App):
         elif total and len(scored) != total:
             msg = f"{len(scored):,} of {total:,} candidates (filtered)"
         else:
-            msg = (f"{len(scored):,} candidates — click a column header "
-                   "to sort")
+            msg = (f"{len(scored):,} candidates — click a row for details; "
+                   "click a column header to sort")
         self.query_one("#results-count", Static).update(msg)
+        self._clear_detail()
 
     @on(DataTable.HeaderSelected, "#results-table")
     def sort_results(self, event: DataTable.HeaderSelected) -> None:
@@ -610,6 +651,78 @@ class GeneWeaverApp(App):
         else:
             self._sort_key, self._sort_reverse = key, False
         self._render_results()
+
+    @on(DataTable.RowSelected, "#results-table")
+    def show_candidate_detail(self, event: DataTable.RowSelected) -> None:
+        row_index = event.cursor_row
+        if 0 <= row_index < len(self._displayed_scored):
+            self._show_candidate_detail(self._displayed_scored[row_index])
+
+    def _clear_detail(self) -> None:
+        try:
+            log = self.query_one("#results-detail", RichLog)
+            log.clear()
+            log.write("(select a result row to inspect the real alignment)")
+        except Exception:
+            pass
+
+    def _show_candidate_detail(self, sc) -> None:
+        c = sc.candidate
+        view = candidate_view(c, self.state.records)
+        breakdown = score_breakdown(c)
+        log = self.query_one("#results-detail", RichLog)
+        log.clear()
+
+        meta = Text()
+        meta.append("Candidate ", style="bold")
+        meta.append(f"{c.chromosome}:{c.start}-{c.end}({c.strand}) ",
+                    style="bold cyan")
+        meta.append(f"score={sc.score:.2f} type={c.match_type} ",
+                    style="bold")
+        meta.append(f"MM={c.mismatches} positions={list(c.mismatch_positions)} "
+                    f"ambiguous={list(c.ambiguous_positions)}\n")
+        meta.append(
+            f"guide={view.guide}  matched={view.matched_sequence or 'n/a'}  "
+            f"genomic={view.genomic_sequence or 'n/a'}\n"
+        )
+        meta.append(
+            f"PAM={view.pam_sequence} (candidate strand; plus footprint "
+            f"{view.pam_plus_sequence or 'n/a'})  PAM coords "
+            f"{c.pam_start}..{c.pam_end}\n"
+        )
+        meta.append(
+            "score parts: "
+            f"mm_penalty={breakdown['mismatch_penalty']} "
+            f"seed_penalty={breakdown['seed_penalty']} "
+            f"pam_penalty={breakdown['pam_penalty']} "
+            f"ambiguity_penalty={breakdown['ambiguity_penalty']} "
+            "(experimental ranking score, not validated)"
+        )
+        log.write(meta)
+
+        if not view.matched_sequence:
+            log.write("Sequence context unavailable for this candidate.")
+            return
+
+        guide_line = Text("guide     ", style="dim")
+        guide_line.append(view.guide, style="bold cyan")
+        match_line = Text("candidate ", style="dim")
+        marker_line = Text("          ", style="dim")
+        for seg in alignment_segments(view):
+            if seg["kind"] == "mismatch":
+                match_line.append(str(seg["matched"]), style="bold red")
+                marker_line.append("^", style="bold red")
+            elif seg["kind"] == "ambiguous":
+                match_line.append(str(seg["matched"]), style="bold yellow")
+                marker_line.append("~", style="bold yellow")
+            else:
+                match_line.append(str(seg["matched"]), style="bold green")
+                marker_line.append(" ")
+        log.write(guide_line)
+        log.write(match_line)
+        log.write(marker_line)
+        log.write("legend: ^ mismatch, ~ compatible IUPAC ambiguity, "
+                  "green exact base match")
 
     def _fill_score_summary(self, result) -> None:
         s = result.score_summary
@@ -631,23 +744,44 @@ class GeneWeaverApp(App):
             min_score = float(self.query_one("#f-min-score", Input).value or "-inf")
         except ValueError:
             min_score = float("-inf")
+        try:
+            max_mm_raw = self.query_one("#f-max-mm", Input).value.strip()
+            max_mm = int(max_mm_raw) if max_mm_raw else None
+            if max_mm is not None and max_mm < 0:
+                raise ValueError
+        except ValueError:
+            self._log("#analyzer-log", "ERROR: max mismatches filter must be "
+                                   "a non-negative integer.")
+            return
         chrom = self.query_one("#f-chrom", Input).value.strip().lower()
         search = self.query_one("#f-search", Input).value.strip().lower()
         strand = self.query_one("#f-strand", Select).value
+        pam_filter = self.query_one("#f-pam", Select).value
+        type_filter = self.query_one("#f-type", Select).value
 
         def _matches(sc) -> bool:
             c = sc.candidate
             if sc.score < min_score:
                 return False
+            if max_mm is not None and c.mismatches > max_mm:
+                return False
             if chrom and chrom not in c.chromosome.lower():
                 return False
             if strand != "all" and c.strand != strand:
                 return False
+            if pam_filter == "yes" and not c.pam_compatible:
+                return False
+            if pam_filter == "no" and c.pam_compatible:
+                return False
+            if type_filter != "all" and c.match_type != type_filter:
+                return False
             if search:
                 haystack = " ".join([
-                    c.chromosome, c.strand, c.pam,
+                    c.chromosome, c.strand, c.pam, c.guide,
+                    c.matched_sequence, c.genomic_sequence,
                     ",".join(map(str, c.mismatch_positions)),
-                    str(c.start), str(c.end),
+                    ",".join(map(str, c.ambiguous_positions)),
+                    str(c.start), str(c.end), str(c.pam_start), str(c.pam_end),
                 ]).lower()
                 if search not in haystack:
                     return False
@@ -659,9 +793,12 @@ class GeneWeaverApp(App):
     @on(Button.Pressed, "#filter-clear")
     def clear_filters(self) -> None:
         self.query_one("#f-min-score", Input).value = ""
+        self.query_one("#f-max-mm", Input).value = ""
         self.query_one("#f-chrom", Input).value = ""
         self.query_one("#f-search", Input).value = ""
         self.query_one("#f-strand", Select).value = "all"
+        self.query_one("#f-pam", Select).value = "all"
+        self.query_one("#f-type", Select).value = "all"
         if self.state.analysis is not None:
             self._visible_scored = list(self.state.analysis.scored)
             self._render_results()
@@ -679,6 +816,10 @@ class GeneWeaverApp(App):
             path = self.state.fasta_path
         try:
             guide = validate_guide(self._guide() or "GAGTCCGAGCAGAAGAAGAA")
+            max_mm = self._max_mm()
+            pams = self._pam()
+            strands = self._strand_tuple()
+            require_pam = self._require_pam()
         except AlignError as exc:
             self._log("#perf-log", f"ERROR: {exc}")
             return
@@ -688,10 +829,13 @@ class GeneWeaverApp(App):
                       "ERROR: GPU unavailable — benchmark requires a "
                       "working CUDA backend.")
             return
-        self._bench_worker(path, guide, backend)
+        self._bench_worker(path, guide, backend, pams, strands, max_mm,
+                           require_pam)
 
     @work(thread=True)
-    def _bench_worker(self, path: str, guide: str, backend: str) -> None:
+    def _bench_worker(self, path: str, guide: str, backend: str,
+                      pam_patterns, strands, max_mismatches: int,
+                      require_pam: bool) -> None:
         def progress(done: int, total: int) -> None:
             self.call_from_thread(self._set_progress, "#bench-progress",
                                   done, total)
@@ -702,10 +846,10 @@ class GeneWeaverApp(App):
                 path, guide, backend=backend,
                 chunk_size=self.state.chunk_size,
                 overlap=self.state.overlap,
-                pam_patterns=self._pam(),
-                strands=self._strand_tuple(),
-                max_mismatches=self._max_mm(),
-                require_pam=self._require_pam(),
+                pam_patterns=pam_patterns,
+                strands=strands,
+                max_mismatches=max_mismatches,
+                require_pam=require_pam,
                 n_workers=self.state.n_workers,
                 processes=self.state.use_processes,
                 records=self.state.records or None,
@@ -779,12 +923,63 @@ class GeneWeaverApp(App):
     def _out_dir(self) -> Path:
         return Path(self.state.out_dir)
 
+    def _analysis_for_export(self):
+        """Return the currently visible scored candidates as an analysis."""
+        result = self.state.analysis
+        if result is None:
+            return None
+        visible = list(self._visible_scored)
+        filtered = len(visible) != len(result.scored)
+        extra = dict(result.extra or {})
+        extra["export_scope"] = "filtered_results" if filtered else "all_results"
+        extra["exported_candidates"] = len(visible)
+        return replace(
+            result,
+            candidates=[sc.candidate for sc in visible],
+            scored=visible,
+            score_summary=score_summary(visible),
+            extra=extra,
+        )
+
+    @on(Button.Pressed, "#exp-csv")
+    @on(Button.Pressed, "#exp-json")
+    @on(Button.Pressed, "#exp-html")
+    @on(Button.Pressed, "#exp-pdf")
+    def export_quick_report(self, event: Button.Pressed) -> None:
+        export = self._analysis_for_export()
+        if export is None:
+            self._log("#analyzer-log", "ERROR: run an analysis first.")
+            self.query_one("#results-count", Static).update(
+                "ERROR: run an analysis first.")
+            return
+        out = self._out_dir()
+        try:
+            if event.button.id == "exp-csv":
+                p = write_csv(export, out / "geneware_results.csv")
+                msg = f"CSV written: {p}"
+            elif event.button.id == "exp-json":
+                p = write_json(export, out / "geneware_results.json")
+                msg = f"JSON written: {p}"
+            elif event.button.id == "exp-html":
+                p = write_html(export, out / "geneware_results.html")
+                msg = f"HTML written: {p}"
+            else:
+                p = write_pdf(export, out / "geneware_results.pdf")
+                msg = f"PDF written: {p}"
+        except Exception as exc:  # noqa: BLE001
+            self.query_one("#results-count", Static).update(
+                f"ERROR: {type(exc).__name__}: {exc}")
+            return
+        self.query_one("#results-count", Static).update(msg)
+        self._log("#home-log", msg)
+
     @on(Button.Pressed, "#rep-csv")
     @on(Button.Pressed, "#rep-json")
     @on(Button.Pressed, "#rep-html")
+    @on(Button.Pressed, "#rep-pdf")
     @on(Button.Pressed, "#rep-bundle")
     def export_report(self, event: Button.Pressed) -> None:
-        result = self.state.analysis
+        result = self._analysis_for_export()
         if result is None:
             self._log("#analyzer-log", "ERROR: run an analysis first.")
             self.query_one("#rep-out", Static).update(
@@ -801,6 +996,9 @@ class GeneWeaverApp(App):
             elif event.button.id == "rep-html":
                 p = write_html(result, out / "geneware_report.html")
                 msg = f"HTML written: {p}"
+            elif event.button.id == "rep-pdf":
+                p = write_pdf(result, out / "geneware_report.pdf")
+                msg = f"PDF written: {p}"
             else:
                 from .reports import write_report_bundle
                 paths = write_report_bundle(result, out)

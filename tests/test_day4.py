@@ -31,7 +31,8 @@ def _chunk(seq: str, chrom: str = "chrX", start: int = 0) -> GenomeChunk:
 
 def _key(c):
     return (c.chromosome, c.start, c.end, c.strand, c.mismatches,
-            c.mismatch_positions, c.pam, c.pam_compatible)
+            c.mismatch_positions, c.pam, c.pam_compatible,
+            c.matched_sequence, c.genomic_sequence, c.ambiguous_positions)
 
 
 def _scan_both_engines(seq: str, guide: str = GUIDE, **kw):

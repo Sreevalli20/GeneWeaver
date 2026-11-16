@@ -107,8 +107,65 @@ async def test_results_column_sort():
         table = app.query_one("#results-table")
         assert table.row_count == 3
         # Sort by 'mm' ascending via the header-selected handler.
-        event = DataTable.HeaderSelected(table, "mm", 5, "MM")
+        event = DataTable.HeaderSelected(table, "mm", 6, "MM")
         app.sort_results(event)
         await pilot.pause(0.1)
-        first_mm = str(table.get_row_at(0)[5])
+        first_mm = str(table.get_row_at(0)[6])
         assert first_mm == "0"
+
+
+@pytest.mark.asyncio
+async def test_results_filters_detail_and_quick_export(tmp_path):
+    """Day-5 dashboard controls operate on real candidate fields."""
+    import csv
+    from textual.widgets import DataTable, Select
+    from geneware.aligner import Candidate, ScanStats
+    from geneware.pipeline import AnalysisResult
+    from geneware.scoring import score_candidates, score_summary
+
+    guide = "A" * 12
+    exact = Candidate("chr1", 10, 22, "+", 0, (), "AGG", True, guide,
+                      matched_sequence=guide, genomic_sequence=guide)
+    near = Candidate("chr1", 30, 42, "-", 1, (4,), "CGG", True, guide,
+                     matched_sequence=guide[:4] + "T" + guide[5:],
+                     genomic_sequence="T" + guide[1:4] + guide[5:],
+                     ambiguous_positions=())
+    scored = score_candidates([exact, near])
+    app = GeneWeaverApp()
+    async with app.run_test() as pilot:
+        app.state.analysis = AnalysisResult(
+            backend="cpu", guide=guide, pam_patterns=("NGG",),
+            strands=("+", "-"), max_mismatches=1, require_pam=True,
+            fasta_path="demo.fasta", records=[],
+            sequence_stats={"record_count": 1}, candidates=[exact, near],
+            scored=scored, stats=ScanStats(candidates_found=2),
+            score_summary=score_summary(scored), elapsed_seconds=0.01)
+        app.state.out_dir = str(tmp_path)
+        app._fill_results(app.state.analysis)
+        table = app.query_one("#results-table", DataTable)
+        assert table.row_count == 2
+
+        app.query_one("#f-max-mm", Input).value = "0"
+        app.query_one("#f-type", Select).value = "exact"
+        app.query_one("#filter-btn", Button).press()
+        await pilot.pause(0.1)
+        assert table.row_count == 1
+        assert str(table.get_row_at(0)[1]) == "exact"
+
+        app.query_one("#filter-clear", Button).press()
+        await pilot.pause(0.1)
+        assert table.row_count == 2
+        app._show_candidate_detail(app._displayed_scored[0])
+        await pilot.pause(0.1)
+        from types import SimpleNamespace
+        app.show_candidate_detail(SimpleNamespace(cursor_row=1))
+        await pilot.pause(0.1)
+
+        app.query_one("#exp-csv", Button).press()
+        await pilot.pause(0.2)
+        out = tmp_path / "geneware_results.csv"
+        assert out.exists()
+        with out.open(newline="", encoding="utf-8") as fh:
+            rows = list(csv.DictReader(fh))
+        assert len(rows) == 2
+        assert rows[0]["matched_sequence"]

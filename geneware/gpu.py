@@ -47,9 +47,12 @@ from pathlib import Path
 from .aligner import (
     DEFAULT_PAM_PATTERNS,
     DEFAULT_STRANDS,
+    AlignError,
     Candidate,
     ScanStats,
+    _ambiguous_positions,
     _mismatch_positions,
+    _normalise_patterns,
     _pam_matches,
     _validate_scan_args,
     deduplicate,
@@ -396,8 +399,10 @@ def _numba_scan(
     guide = validate_guide(guide)
     records = list(records)
     validate_overlap(records, guide, chunk_size, overlap, pam_patterns)
-    patterns = ["".join(p.split()).upper() for p in pam_patterns]
+    patterns = _normalise_patterns(pam_patterns)
     strand_set, pam_len = _validate_scan_args(patterns, strands)
+    if max_mismatches < 0:
+        raise AlignError(f"max_mismatches must be >= 0, got {max_mismatches}")
     L = len(guide)
     guide_rc = revcomp(guide)
 
@@ -459,10 +464,12 @@ def _numba_scan(
                 # exact IUPAC semantics (positions + strand PAM string).
                 for j in np.flatnonzero(mm <= max_mismatches):
                     i = int(starts[j])
-                    window = seq[i : i + L]
-                    mm_pos = _mismatch_positions(guide, window)
+                    genomic_window = seq[i : i + L]
+                    matched = genomic_window
+                    mm_pos = _mismatch_positions(guide, matched)
                     if len(mm_pos) > max_mismatches:
                         continue
+                    amb_pos = _ambiguous_positions(guide, matched, mm_pos)
                     pam = seq[i + L : i + L + pam_len]
                     compat = _pam_matches(pam, patterns)
                     if compat or not require_pam:
@@ -477,6 +484,9 @@ def _numba_scan(
                             pam=pam,
                             pam_compatible=compat,
                             guide=guide,
+                            matched_sequence=matched,
+                            genomic_sequence=genomic_window,
+                            ambiguous_positions=amb_pos,
                         ))
 
         if "-" in strand_set:
@@ -486,10 +496,12 @@ def _numba_scan(
             if starts is not None:
                 for j in np.flatnonzero(mm <= max_mismatches):
                     i = int(starts[j])
-                    window_rc = revcomp(seq[i : i + L])
-                    mm_pos = _mismatch_positions(guide, window_rc)
+                    genomic_window = seq[i : i + L]
+                    matched = revcomp(genomic_window)
+                    mm_pos = _mismatch_positions(guide, matched)
                     if len(mm_pos) > max_mismatches:
                         continue
+                    amb_pos = _ambiguous_positions(guide, matched, mm_pos)
                     pam = revcomp(seq[i - pam_len : i])
                     compat = _pam_matches(pam, patterns)
                     if compat or not require_pam:
@@ -504,6 +516,9 @@ def _numba_scan(
                             pam=pam,
                             pam_compatible=compat,
                             guide=guide,
+                            matched_sequence=matched,
+                            genomic_sequence=genomic_window,
+                            ambiguous_positions=amb_pos,
                         ))
 
         del d_seq

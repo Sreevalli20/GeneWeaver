@@ -62,7 +62,8 @@ DEFAULT_OUT_DIR = Path("reports")
 
 STRAND_OPTIONS = [("Both (+ and -)", "both"), ("Forward (+) only", "+"),
                   ("Reverse (-) only", "-")]
-BACKEND_OPTIONS = [("CPU (sequential)", "cpu"), ("GPU (CUDA)", "gpu"),
+BACKEND_OPTIONS = [("Auto (best available)", "auto"),
+                   ("CPU (sequential)", "cpu"), ("GPU (CUDA)", "gpu"),
                    ("Dask (distributed CPU)", "dask")]
 
 

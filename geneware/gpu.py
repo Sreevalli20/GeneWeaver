@@ -91,6 +91,7 @@ class GpuStatus:
     backend: str = "none"          # 'numba-cuda' | 'cupy' | 'none'
     device_name: str | None = None
     vram_total_mb: float | None = None
+    vram_free_mb: float | None = None
     compute_capability: str | None = None
     driver_note: str | None = None
     reason: str = ""
@@ -102,6 +103,7 @@ class GpuStatus:
             "backend": self.backend,
             "device_name": self.device_name,
             "vram_total_mb": self.vram_total_mb,
+            "vram_free_mb": self.vram_free_mb,
             "compute_capability": self.compute_capability,
             "driver_note": self.driver_note,
             "reason": self.reason,
@@ -226,6 +228,7 @@ def _probe_numba() -> GpuStatus | None:
                 else str(raw_name)).strip()
         cc = ".".join(str(x) for x in dev.compute_capability)
         vram_mb = None
+        vram_free_mb = None
         try:
             # cuMemGetInfo needs an active context; select_device creates one.
             cuda.select_device(0)
@@ -234,6 +237,7 @@ def _probe_numba() -> GpuStatus | None:
             _free, _total = c_size_t(), c_size_t()
             _drv.cuMemGetInfo(byref(_free), byref(_total))
             vram_mb = _total.value / (1024 * 1024)
+            vram_free_mb = _free.value / (1024 * 1024)
         except Exception:
             try:
                 vram = dev.attributes.get("TOTAL_GLOBAL_MEM", None)
@@ -245,6 +249,7 @@ def _probe_numba() -> GpuStatus | None:
             backend="numba-cuda",
             device_name=name,
             vram_total_mb=vram_mb,
+            vram_free_mb=vram_free_mb,
             compute_capability=cc,
         )
     except Exception as exc:

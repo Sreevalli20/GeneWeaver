@@ -41,7 +41,26 @@ from .scoring import (
     score_summary,
 )
 
-BACKENDS = ("cpu", "gpu", "dask")
+BACKENDS = ("cpu", "gpu", "dask", "auto")
+
+
+def _resolve_auto_backend() -> str:
+    """Pick the best genuinely-available backend for ``auto`` mode.
+
+    Order: GPU (numba CUDA) > Dask parallel CPU > sequential CPU.
+    Every probe is real — the returned name is what will actually run.
+    """
+    try:
+        from .gpu import detect_gpu
+        if detect_gpu().available:
+            return "gpu"
+    except Exception:
+        pass
+    try:
+        import distributed  # noqa: F401
+        return "dask"
+    except Exception:
+        return "cpu"
 
 
 class AnalysisError(RuntimeError):
@@ -186,7 +205,9 @@ def run_analysis(
 ) -> AnalysisResult:
     """Full analysis: parse FASTA, scan on backend, score, summarise."""
     if backend not in BACKENDS:
-        raise AnalysisError(f"unknown backend {backend!r}; choose cpu|gpu|dask")
+        raise AnalysisError(f"unknown backend {backend!r}; choose cpu|gpu|dask|auto")
+    if backend == "auto":
+        backend = _resolve_auto_backend()
     fasta_path = Path(fasta_path)
     guide = validate_guide(guide)
     if max_mismatches < 0:

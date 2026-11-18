@@ -61,7 +61,7 @@ geneware/
   reports.py       CSV / JSON / HTML / PDF report export
   app.py           Textual dashboard — 10 functional tabs
   cli.py           argparse CLI (parse/scan/bench/analyze/report/gpu-status)
-tests/             pytest suite (111 tests)
+tests/             pytest suite (116 tests)
 data/example.fasta small synthetic demo genome (test fixture)
 data/bench_20mb.fasta 20 Mbp synthetic benchmark genome (3 records,
                    90 planted guide+PAM hits)
@@ -120,8 +120,8 @@ pytest.ini         pytest-asyncio configuration
 
 ### GPU acceleration (`gpu.py`) — verified working on this laptop
 * Real detection probe: `numba.cuda` first, `cupy` second; reports
-  device name, VRAM (`cuda.mem_get_info`), and compute capability
-  (RTX 5050, CC 12.0) when present.
+  device name, total and free VRAM (`cuMemGetInfo`), and compute
+  capability (RTX 5050, CC 12.0) when present.
 * `_ensure_cuda_home()` auto-provisions the CUDA libraries numba needs
   from the `nvidia-*-cu12` pip wheels (or respects a user-set
   `CUDA_HOME`/`CUDA_PATH` / CUDA toolkit).
@@ -184,8 +184,13 @@ pytest.ini         pytest-asyncio configuration
   (`extra["memory_peak_bytes"]`) and reports `chunks_total` /
   `chunks_completed` / `chunks_pending` for every backend.
 * CPU-vs-GPU comparison only appears when both backends actually ran —
-  never fabricated. CLI: `bench --backend cpu|gpu|dask` or
-  `bench --compare` (runs the identical workload on CPU then GPU).
+  never fabricated. CLI: `bench --backend cpu|gpu|dask|auto` or
+  `bench --compare` (runs the identical workload on CPU, Dask, then
+  GPU — each skipped with a printed reason when unavailable).
+* `--backend auto` (CLI and dashboard) resolves to the best genuinely
+  available backend at run time: GPU → Dask parallel CPU → sequential
+  CPU; `result.backend`/`processing_method` always report what actually
+  ran.
 
 #### Measured on this machine (20 Mbp synthetic genome, guide 20 nt,
 max_mismatches=0, both strands, chunk_size=1 Mb, overlap=64)
@@ -244,7 +249,7 @@ python -m geneware.cli gpu-status
 ```
 
 Common options: `--chunk-size`, `--overlap`, `--pam`, `--strand`,
-`--max-mismatches`, `--allow-pam-mismatch`, `--backend cpu|gpu|dask`,
+`--max-mismatches`, `--allow-pam-mismatch`, `--backend cpu|gpu|dask|auto`,
 `--workers`, `--threads`, `--compare`, `--json`.
 `GENEWEARE_ALIGNER_ENGINE=python` forces the pure-Python CPU engine
 (for A/B benchmarking against the numba-JIT default).
@@ -255,7 +260,7 @@ Common options: `--chunk-size`, `--overlap`, `--pam`, `--strand`,
 python -m pytest tests -q
 ```
 
-111 tests cover: FASTA parsing edge cases, chunk boundaries, both
+116 tests cover: FASTA parsing edge cases, chunk boundaries, both
 strands, PAM matching/validation, mismatch and ambiguity positions,
 matched/genomic sequence provenance, exact-vs-near typing, deduplication,
 scoring formula/breakdown/ranking, GPU detection contract + CPU fallback
@@ -266,7 +271,9 @@ equality with sequential results + pending/completed tracking, CSV/JSON/
 HTML/PDF report generation and contents, pipeline backends +
 memory-error surfacing, benchmark backend field, and Textual app smoke
 tests (tab mounting, genome load, full CPU analysis, results metrics,
-filtering, sorting, candidate detail, quick export, and empty state).
+filtering, sorting, candidate detail, quick export, and empty state),
+auto-backend resolution, GPU VRAM field reporting, and Dask
+worker-failure capture / pending-completed accounting.
 
 ## Coordinate & matching conventions
 

@@ -37,7 +37,7 @@ def _add_common(p: argparse.ArgumentParser) -> None:
 
 
 def _add_backend(p: argparse.ArgumentParser) -> None:
-    p.add_argument("--backend", choices=["cpu", "gpu", "dask"],
+    p.add_argument("--backend", choices=["cpu", "gpu", "dask", "auto"],
                    default="cpu",
                    help="execution backend (default: cpu)")
     p.add_argument("--workers", type=int, default=None,
@@ -97,12 +97,19 @@ def cmd_bench(args: argparse.Namespace) -> int:
     # --compare runs the same input/settings on CPU then GPU (when a GPU
     # backend genuinely works) so both measured results are shown.
     if getattr(args, "compare", False):
-        backends = ["cpu", "gpu"]
+        backends = ["cpu", "dask", "gpu"]
     else:
         backends = [args.backend]
 
     rc = 0
     for backend in backends:
+        if backend == "dask":
+            try:
+                import distributed  # noqa: F401
+            except Exception:
+                print("SKIP dask: distributed not importable",
+                      file=sys.stderr)
+                continue
         if backend == "gpu":
             from .gpu import gpu_available
             if not gpu_available():

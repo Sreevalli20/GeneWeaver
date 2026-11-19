@@ -11,10 +11,10 @@ async def test_app_mounts_all_tabs():
     app = GeneWeaverApp()
     async with app.run_test() as pilot:
         await pilot.pause()
-        # All ten tabs must exist in the DOM.
+        # All ten sections must exist in the DOM.
         for tid in ("tab-home", "tab-genome", "tab-analyzer", "tab-results",
-                    "tab-scoring", "tab-performance", "tab-dask",
-                    "tab-benchmarks", "tab-reports", "tab-settings"):
+                    "tab-scoring", "tab-performance", "tab-systems",
+                    "tab-dask", "tab-reports", "tab-settings"):
             assert app.query_one(f"#{tid}") is not None
 
 

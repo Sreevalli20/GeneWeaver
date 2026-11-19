@@ -1,16 +1,16 @@
 """GeneWeaver terminal dashboard (Textual).
 
-Ten functional tabs matching the application specification:
+Ten functional sections matching the application specification:
 
-  1. Home / Overview
-  2. Genome File Manager
-  3. CRISPR Sequence Analyzer
+  1. Overview
+  2. Genome Files
+  3. CRISPR Analysis
   4. Alignment Results
   5. Biological Scoring
-  6. CPU / GPU Performance
-  7. Dask Processing Status
-  8. Benchmark Comparison
-  9. Reports
+  6. Processing Performance
+  7. CPU and GPU Status
+  8. Dask Processing
+  9. Reports and Exports
   10. Settings
 
 Every control performs a real operation: genome loading parses and
@@ -23,7 +23,10 @@ lists the requirements.
 
 from __future__ import annotations
 
+import os
+import platform
 import sys
+import time
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 
@@ -53,7 +56,7 @@ from .benchmark import format_bytes, format_result
 from .dask_engine import dask_status
 from .fasta import FastaParseError, compute_stats, iter_fasta
 from .gpu import detect_gpu
-from .pipeline import AnalysisError, run_analysis
+from .pipeline import AnalysisError, _resolve_auto_backend, run_analysis
 from .reports import write_csv, write_html, write_json, write_pdf
 from .scoring import score_breakdown, score_formula_text, score_summary
 
@@ -65,6 +68,10 @@ STRAND_OPTIONS = [("Both (+ and -)", "both"), ("Forward (+) only", "+"),
 BACKEND_OPTIONS = [("Auto (best available)", "auto"),
                    ("CPU (sequential)", "cpu"), ("GPU (CUDA)", "gpu"),
                    ("Dask (distributed CPU)", "dask")]
+
+
+class _AnalysisCancelled(Exception):
+    """Raised inside a scan worker when the user requests cancellation."""
 
 
 @dataclass
@@ -137,6 +144,7 @@ class GeneWeaverApp(App):
         ("Start", "start"), ("End", "end"), ("Strand", "strand"),
         ("MM", "mm"), ("MM pos", "mm_pos"), ("Ambig", "ambig"),
         ("PAM", "pam"), ("PAM ok", "pam_ok"), ("Match", "match"),
+        ("Guide", "guide"),
     ]
 
     def __init__(self) -> None:
@@ -146,6 +154,9 @@ class GeneWeaverApp(App):
         self._displayed_scored: list = []
         self._sort_key: str | None = None
         self._sort_reverse: bool = False
+        self._analysis_worker = None
+        self._cancel_requested = False
+        self._active_status_id = "#analyze-status"
 
     # ------------------------------------------------------------------ UI
 
@@ -162,8 +173,8 @@ class GeneWeaverApp(App):
             yield from self._results_tab()
             yield from self._scoring_tab()
             yield from self._performance_tab()
+            yield from self._systems_tab()
             yield from self._dask_tab()
-            yield from self._benchmark_tab()
             yield from self._reports_tab()
             yield from self._settings_tab()
         yield Footer()
@@ -171,24 +182,25 @@ class GeneWeaverApp(App):
     # -- tab builders ----------------------------------------------------
 
     def _home_tab(self) -> TabPane:
-        with TabPane("Home", id="tab-home"):
-            yield Label("Status overview", classes="section-label")
+        with TabPane("Overview", id="tab-home"):
+            yield Label("Current state", classes="section-label")
             yield Static("(refreshing…)", id="home-status")
             yield Label("Quick start", classes="section-label")
             yield Static(
-                "1. Open the 'Genome' tab and load a FASTA file "
+                "1. Open 'Genome Files' and load a FASTA file "
                 "(or 'Load Example Genome').\n"
-                "2. Open 'CRISPR Analyzer', enter a guide sequence, choose "
+                "2. Open 'CRISPR Analysis', enter a guide sequence, choose "
                 "PAM / mismatches / backend, then 'Analyze'.\n"
-                "3. Review scored results in 'Alignment Results', compare "
-                "backends in 'Benchmark Comparison', export via 'Reports'.",
+                "3. Follow live progress, review scored results in "
+                "'Alignment Results', compare backends in 'Processing "
+                "Performance', and export via 'Reports and Exports'.",
                 id="home-guide",
             )
             yield Label("Log", classes="section-label")
             yield RichLog(id="home-log", wrap=True)
 
     def _genome_tab(self) -> TabPane:
-        with TabPane("Genome", id="tab-genome"):
+        with TabPane("Genome Files", id="tab-genome"):
             with Horizontal():
                 yield Input(placeholder="path/to/genome.fasta",
                              id="genome-path")
@@ -200,8 +212,8 @@ class GeneWeaverApp(App):
             yield DataTable(id="genome-table")
 
     def _analyzer_tab(self) -> TabPane:
-        with TabPane("Analyzer", id="tab-analyzer"):
-            yield Static("(load a genome in the Genome tab first)",
+        with TabPane("CRISPR Analysis", id="tab-analyzer"):
+            yield Static("(load a genome in 'Genome Files' first)",
                          id="analyzer-genome-status")
             with Horizontal():
                 with Vertical():
@@ -231,12 +243,13 @@ class GeneWeaverApp(App):
                                    id="require-pam-check")
                     yield Button("Analyze", id="analyze-btn",
                                  variant="success")
+                    yield Button("Cancel", id="analyze-cancel")
             yield ProgressBar(total=100, show_eta=False, id="analyze-progress")
             yield Static("(no analysis yet)", id="analyze-status")
             yield RichLog(id="analyzer-log", wrap=True)
 
     def _results_tab(self) -> TabPane:
-        with TabPane("Results", id="tab-results"):
+        with TabPane("Alignment Results", id="tab-results"):
             with Horizontal():
                 yield Input(placeholder="min score (e.g. 80)", id="f-min-score")
                 yield Input(placeholder="max mismatches", id="f-max-mm")
@@ -267,15 +280,15 @@ class GeneWeaverApp(App):
                 yield Button("Export PDF", id="exp-pdf")
 
     def _scoring_tab(self) -> TabPane:
-        with TabPane("Scoring", id="tab-scoring"):
+        with TabPane("Biological Scoring", id="tab-scoring"):
             yield Static(score_formula_text(), id="score-formula")
             yield Label("Score summary (last analysis)",
                         classes="section-label")
             yield Static("(no analysis yet)", id="score-summary")
 
     def _performance_tab(self) -> TabPane:
-        with TabPane("Performance", id="tab-performance"):
-            yield Static("(probing GPU…)", id="perf-gpu")
+        with TabPane("Processing Performance", id="tab-performance"):
+            yield Label("Run a measured benchmark", classes="section-label")
             with Horizontal():
                 yield Select(BACKEND_OPTIONS, value="cpu", allow_blank=False,
                              id="bench-backend")
@@ -284,10 +297,27 @@ class GeneWeaverApp(App):
             yield Static("(no benchmark run yet)", id="bench-out")
             yield Label("Last run (measured)", classes="section-label")
             yield Static("(no analysis yet)", id="perf-last")
+            yield Label("Recorded benchmarks", classes="section-label")
+            yield Static("(no benchmarks recorded — run one above)",
+                         id="bench-count")
+            yield DataTable(id="bench-table")
             yield RichLog(id="perf-log", wrap=True)
 
+    def _systems_tab(self) -> TabPane:
+        with TabPane("CPU/GPU Status", id="tab-systems"):
+            yield Label("CPU", classes="section-label")
+            yield Static("(probing…)", id="sys-cpu")
+            yield Label("GPU", classes="section-label")
+            yield Static("(probing…)", id="sys-gpu")
+            yield Label("Execution engines", classes="section-label")
+            yield Static("(probing…)", id="sys-engines")
+            with Horizontal():
+                yield Button("Refresh status", id="sys-refresh",
+                             variant="primary")
+            yield RichLog(id="sys-log", wrap=True)
+
     def _dask_tab(self) -> TabPane:
-        with TabPane("Dask", id="tab-dask"):
+        with TabPane("Dask Processing", id="tab-dask"):
             yield Static("(probing…)", id="dask-status")
             yield Button("Refresh Dask status", id="dask-refresh")
             yield Label("Run a Dask-distributed scan", classes="section-label")
@@ -296,14 +326,8 @@ class GeneWeaverApp(App):
             yield ProgressBar(total=100, show_eta=False, id="dask-progress")
             yield Static("(no dask scan yet)", id="dask-out")
 
-    def _benchmark_tab(self) -> TabPane:
-        with TabPane("Benchmarks", id="tab-benchmarks"):
-            yield Static("(no benchmarks recorded — run one in the "
-                         "Performance tab)", id="bench-count")
-            yield DataTable(id="bench-table")
-
     def _reports_tab(self) -> TabPane:
-        with TabPane("Reports", id="tab-reports"):
+        with TabPane("Reports and Exports", id="tab-reports"):
             yield Static("Export the last completed analysis "
                          "(set output dir in Settings).",
                          classes="section-label")
@@ -376,37 +400,156 @@ class GeneWeaverApp(App):
         return bool(self.query_one("#require-pam-check", Checkbox).value)
 
     def _refresh_home_status(self) -> None:
+        """Render the Overview panel from real application state only."""
+        st = self.state
         gpu = detect_gpu()
         ds = dask_status()
-        st = self.state
-        lines = [
-            f"Genome : {'loaded — ' + st.fasta_path if st.fasta_path else 'not loaded'}",
-            f"GPU    : {'AVAILABLE — ' + str(gpu.device_name) if gpu.available else 'unavailable — ' + gpu.reason}",
-            f"Dask   : {'available — ' + str(ds.get('workers')) + ' workers' if ds.get('available') else 'unavailable — ' + str(ds.get('reason'))}",
-            f"Last analysis: {st.analysis.backend if st.analysis else 'none'} "
-            f"({len(st.analysis.candidates) if st.analysis else 0} candidates)",
-            f"Benchmarks recorded: {len(st.benchmarks)}",
-        ]
+
+        if st.fasta_path and st.sequence_stats:
+            s = st.sequence_stats
+            genome = (
+                f"Genome : {Path(st.fasta_path).name}\n"
+                f"  records: {s.get('record_count')}   "
+                f"bases: {s.get('total_bases'):,}   "
+                f"GC: {s.get('gc_percent')}%   "
+                f"ambiguous: {s.get('ambiguous_count'):,}"
+            )
+        elif st.fasta_path:
+            genome = f"Genome : {st.fasta_path} (statistics unavailable)"
+        else:
+            genome = ("Genome : not loaded — open 'Genome Files' and load "
+                      "a FASTA file (or 'Load Example Genome').")
+
+        a = st.analysis
+        if a is not None:
+            analysis = (
+                f"Last analysis [{a.backend}]: "
+                f"{len(a.scored):,} candidates exported, "
+                f"{a.stats.candidates_found:,} matches found, "
+                f"{a.elapsed_seconds:.3f}s\n"
+                f"  method: {a.processing_method}   "
+                f"guide: {a.guide}"
+            )
+        else:
+            analysis = ("Last analysis: none — configure a guide in "
+                        "'CRISPR Analysis' and press Analyze.")
+
+        if st.benchmarks:
+            b = st.benchmarks[-1]
+            bench = (
+                f"Latest benchmark [{b.backend}]: "
+                f"{b.total_seconds:.3f}s total, "
+                f"{b.throughput_bases_per_sec:,.0f} bases/s, "
+                f"{b.candidates_found:,} candidates"
+            )
+        else:
+            bench = ("Latest benchmark: none — run one in 'Processing "
+                     "Performance'.")
+
+        backends = (
+            f"Backends: GPU {'available' if gpu.available else 'unavailable'}"
+            f" | Dask {'available' if ds.get('available') else 'unavailable'}"
+            f" | auto -> {_resolve_auto_backend()}"
+        )
+        text = "\n".join([genome, "", analysis, "", bench, "", backends])
         try:
-            self.query_one("#home-status", Static).update("\n".join(lines))
+            self.query_one("#home-status", Static).update(text)
         except Exception:
             pass
 
-    def _refresh_perf_gpu(self) -> None:
-        gpu = detect_gpu()
-        if gpu.available:
-            text = (f"GPU: AVAILABLE — {gpu.device_name} "
-                    f"(VRAM {gpu.vram_total_mb:.0f} MiB, "
-                    f"CC {gpu.compute_capability}, backend {gpu.backend})"
-                    if gpu.vram_total_mb is not None else
-                    f"GPU: AVAILABLE — {gpu.device_name} "
-                    f"(backend {gpu.backend})")
-        else:
-            text = f"GPU: unavailable — {gpu.reason}"
+    # ----------------------------------------------------- systems status
+
+    def _refresh_systems(self, force: bool = False) -> None:
+        """Probe and display real CPU/GPU/engine status."""
         try:
-            self.query_one("#perf-gpu", Static).update(text)
+            cpu_count = os.cpu_count() or 0
+            try:
+                proc_count = os.process_cpu_count() or cpu_count
+            except (AttributeError, OSError):
+                proc_count = cpu_count
+            cpu_text = (
+                f"processor : {platform.processor() or 'unknown'}\n"
+                f"cores     : {cpu_count} logical "
+                f"({proc_count} usable by this process)\n"
+                f"platform  : {platform.system()} {platform.release()} "
+                f"{platform.machine()}\n"
+                f"python    : {platform.python_version()} "
+                f"({sys.executable})"
+            )
+            self.query_one("#sys-cpu", Static).update(cpu_text)
+        except Exception as exc:  # noqa: BLE001
+            try:
+                self.query_one("#sys-cpu", Static).update(
+                    f"CPU probe failed: {type(exc).__name__}: {exc}")
+            except Exception:
+                pass
+
+        gpu = detect_gpu(force=force)
+        if gpu.available:
+            gpu_text = (
+                f"GPU: AVAILABLE — backend {gpu.backend}\n"
+                f"  device    : {gpu.device_name}\n"
+                f"  compute   : CC {gpu.compute_capability}\n"
+                f"  VRAM      : {gpu.vram_free_mb:.0f} MiB free / "
+                f"{gpu.vram_total_mb:.0f} MiB total\n"
+                f"  note      : {gpu.driver_note or 'driver OK'}"
+                if gpu.vram_total_mb is not None
+                and gpu.vram_free_mb is not None else
+                f"GPU: AVAILABLE — backend {gpu.backend}, "
+                f"device {gpu.device_name}"
+            )
+        else:
+            gpu_text = (
+                f"GPU: unavailable — {gpu.reason}\n"
+                "Requirements:\n"
+                + "\n".join(f"  - {r}" for r in gpu.requirements)
+            )
+        try:
+            self.query_one("#sys-gpu", Static).update(gpu_text)
         except Exception:
             pass
+
+        engine_lines = [
+            f"aligner engine : {os.environ.get('GENEWEARE_ALIGNER_ENGINE', 'auto')}"
+            " (auto = numba-JIT when importable, else encoded pure Python)",
+        ]
+        try:
+            import numba  # noqa: F401
+            engine_lines.append(
+                f"numba         : {numba.__version__} — JIT CPU kernel "
+                "and CUDA backend available")
+        except Exception as exc:
+            engine_lines.append(
+                f"numba         : unavailable ({type(exc).__name__}) — "
+                "pure-Python aligner fallback in use")
+        try:
+            import dask  # noqa: F401
+            import distributed  # noqa: F401
+            engine_lines.append(
+                f"dask          : {dask.__version__} / "
+                f"{distributed.__version__} — distributed backend usable")
+        except Exception:
+            engine_lines.append("dask          : unavailable")
+        try:
+            engine_lines.append(
+                f"auto resolves : {_resolve_auto_backend()} "
+                "(gpu > dask > cpu, probed live)")
+        except Exception:
+            pass
+        try:
+            self.query_one("#sys-engines", Static).update(
+                "\n".join(engine_lines))
+        except Exception:
+            pass
+
+    @on(Button.Pressed, "#sys-refresh")
+    def refresh_systems(self) -> None:
+        self._refresh_systems(force=True)
+
+    def action_refresh_status(self) -> None:
+        self._refresh_home_status()
+        self._refresh_dask_status()
+        self._refresh_systems()
 
     def _update_perf_last(self, analysis) -> None:
         """Render the last run's measured performance into the panel."""
@@ -436,11 +579,6 @@ class GeneWeaverApp(App):
             self.query_one("#perf-last", Static).update("\n".join(lines))
         except Exception:
             pass
-
-    def action_refresh_status(self) -> None:
-        self._refresh_home_status()
-        self._refresh_dask_status()
-        self._refresh_perf_gpu()
 
     # ------------------------------------------------------- genome loading
 
@@ -493,6 +631,13 @@ class GeneWeaverApp(App):
                   f"{stats['total_bases']:,} bases from {path_str}")
         self._log("#home-log",
                   f"Genome loaded: {path_str} ({stats['total_bases']:,} bases)")
+        try:
+            self.query_one("#analyzer-genome-status", Static).update(
+                f"Genome ready: {Path(path_str).name} — "
+                f"{stats['record_count']} record(s), "
+                f"{stats['total_bases']:,} bases, GC {stats['gc_percent']}%")
+        except Exception:
+            pass
         self._refresh_home_status()
         self._set_progress("#genome-progress", 100, 100)
 
@@ -512,7 +657,7 @@ class GeneWeaverApp(App):
                 self._log(
                     "#analyzer-log",
                     "ERROR: GPU unavailable — " + gpu.reason
-                    + ". See Home tab / `python -m geneware.cli gpu-status`.")
+                    + ". See 'CPU/GPU Status' / `python -m geneware.cli gpu-status`.")
                 return
         try:
             guide = validate_guide(self._guide())
@@ -524,19 +669,59 @@ class GeneWeaverApp(App):
         except (AlignError, ValueError) as exc:
             self._log("#analyzer-log", f"ERROR: {exc}")
             return
-        self._analyze_worker(
+        self._cancel_requested = False
+        progress_bar = "#dask-progress" if backend == "dask" else "#analyze-progress"
+        self._active_status_id = ("#dask-out" if backend == "dask"
+                                  else "#analyze-status")
+        self._set_progress(progress_bar, 0, 1)
+        self._set_analysis_status(
+            f"Starting {backend} analysis…", self._active_status_id)
+        self._analysis_worker = self._analyze_worker(
             backend=backend, guide=guide, workers=workers,
             pam_patterns=pams, strands=strands, max_mismatches=max_mm,
-            require_pam=require_pam,
-            progress_bar="#analyze-progress" if backend != "dask"
-            else "#dask-progress")
+            require_pam=require_pam, progress_bar=progress_bar)
+
+    @on(Button.Pressed, "#analyze-cancel")
+    def cancel_analysis(self) -> None:
+        worker = self._analysis_worker
+        running = worker is not None and getattr(worker, "is_running", False)
+        if self._cancel_requested or running:
+            self._cancel_requested = True
+            if running:
+                try:
+                    worker.cancel()
+                except Exception:
+                    pass
+            self._log("#analyzer-log",
+                      "Cancellation requested — the scan will stop at the "
+                      "next chunk boundary.")
+            self._set_analysis_status(
+                "Cancelling…", "#analyze-status")
+        else:
+            self._log("#analyzer-log", "No analysis is currently running.")
+
+    def _set_analysis_status(self, text: str, widget_id: str) -> None:
+        try:
+            self.query_one(widget_id, Static).update(text)
+        except Exception:
+            pass
 
     @work(thread=True)
     def _analyze_worker(self, backend: str, guide: str, workers: int,
                         pam_patterns, strands, max_mismatches: int,
                         require_pam: bool, progress_bar: str) -> None:
+        status_id = self._active_status_id
+        t0 = time.perf_counter()
+
         def progress(done: int, total: int) -> None:
+            if self._cancel_requested:
+                raise _AnalysisCancelled("cancelled by user")
+            elapsed = time.perf_counter() - t0
             self.call_from_thread(self._set_progress, progress_bar, done, total)
+            self.call_from_thread(
+                self._set_analysis_status,
+                f"{backend}: {done}/{total} chunks — {elapsed:.1f}s elapsed",
+                status_id)
 
         try:
             result = run_analysis(
@@ -552,13 +737,24 @@ class GeneWeaverApp(App):
                 records=self.state.records,
                 progress=progress,
             )
+        except _AnalysisCancelled as exc:
+            self.call_from_thread(
+                self._set_analysis_status, f"Cancelled: {exc}", status_id)
+            self.call_from_thread(self._log, "#analyzer-log",
+                                  f"Analysis cancelled by user ({backend}).")
+            return
         except (AnalysisError, FastaParseError, AlignError) as exc:
             self.call_from_thread(self._log, "#analyzer-log",
                                   f"ERROR: {exc}")
+            self.call_from_thread(
+                self._set_analysis_status, f"Failed: {exc}", status_id)
             return
         except Exception as exc:  # noqa: BLE001
             self.call_from_thread(self._log, "#analyzer-log",
                                   f"ERROR: {type(exc).__name__}: {exc}")
+            self.call_from_thread(
+                self._set_analysis_status,
+                f"Failed: {type(exc).__name__}: {exc}", status_id)
             return
         self.call_from_thread(self._on_analysis_done, result)
 
@@ -570,6 +766,10 @@ class GeneWeaverApp(App):
                f"{result.stats.candidates_found:,} candidates, "
                f"{result.stats.windows_evaluated:,} windows, "
                f"{result.elapsed_seconds:.3f}s")
+        self._set_analysis_status(
+            f"{result.backend}: complete — "
+            f"{result.stats.candidates_found:,} matches, "
+            f"{result.elapsed_seconds:.3f}s", self._active_status_id)
         self._log("#analyzer-log", msg)
         self._log("#home-log", msg)
         self._update_perf_last(result)
@@ -623,6 +823,7 @@ class GeneWeaverApp(App):
                 ",".join(map(str, c.ambiguous_positions)) or "-",
                 c.pam, "yes" if c.pam_compatible else "no",
                 c.matched_sequence or "-",
+                c.guide,
             )
         analysis = self.state.analysis
         total = len(analysis.scored) if analysis is not None else 0
@@ -1039,7 +1240,7 @@ class GeneWeaverApp(App):
     def on_mount(self) -> None:
         self._refresh_home_status()
         self._refresh_dask_status()
-        self._refresh_perf_gpu()
+        self._refresh_systems()
 
 
 def main() -> None:

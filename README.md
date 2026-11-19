@@ -61,7 +61,7 @@ geneware/
   reports.py       CSV / JSON / HTML / PDF report export
   app.py           Textual dashboard — 10 functional tabs
   cli.py           argparse CLI (parse/scan/bench/analyze/report/gpu-status)
-tests/             pytest suite (116 tests)
+tests/             pytest suite (122 tests)
 data/example.fasta small synthetic demo genome (test fixture)
 data/bench_20mb.fasta 20 Mbp synthetic benchmark genome (3 records,
                    90 planted guide+PAM hits)
@@ -152,28 +152,51 @@ pytest.ini         pytest-asyncio configuration
 * Backend honestly reported as `dask-processes`, `dask-threads`, or
   `dask-external`. No distributed-GPU claims.
 
-### Dashboard (`app.py`) — 10 tabs, every control functional
-1. **Home** — live status (genome/GPU/Dask/last analysis), quick start.
-2. **Genome** — load FASTA or example, record table, real stats.
-3. **Analyzer** — guide, PAM, strand, max mismatches, require-PAM,
-   backend select, workers, progress bar, analyze.
-4. **Results** — guide/PAM/settings summary, metrics line (sequences,
-   bases, windows, matches, mismatches, method, elapsed), sortable
-   DataTable with score/type/coordinates/strand/MM positions/ambiguity/
-   PAM/matched sequence, min-score/max-mismatch/chromosome/strand/
-   PAM-compatibility/match-type/search filters, click-row candidate
-   detail with highlighted guide-vs-candidate alignment and score
-   breakdown, and working quick CSV/JSON/HTML/PDF export of the current
-   filtered view.
-5. **Scoring** — formula explanation + last-run score summary.
-6. **Performance** — GPU availability probe, benchmark runner for
-   cpu/gpu/dask backends, and a "last run" panel showing method,
-   status, chunks done/total, elapsed time, measured throughput,
-   peak Python memory, and candidate counts.
-7. **Dask** — real scheduler status + one-click Dask analysis.
-8. **Benchmarks** — comparison table of every recorded run.
-9. **Reports** — write CSV/JSON/HTML/PDF/bundle to the configured dir.
-10. **Settings** — chunk size, overlap, workers, processes, out dir.
+### Dashboard (`app.py`) — 10 sections, every control functional
+1. **Overview** — live state from real app data only: loaded FASTA
+   filename, record/base/GC/ambiguity statistics, last analysis
+   (backend, candidate and match counts, elapsed time, processing
+   method, guide), latest benchmark (backend, total seconds,
+   throughput), and backend availability. Clear empty-state text when
+   nothing has been loaded or run yet.
+2. **Genome Files** — load FASTA or the bundled example, per-record
+   table (ID, length, GC%, description), real aggregate statistics,
+   clear parse-error messages.
+3. **CRISPR Analysis** — guide spacer, PAM patterns, strand, max
+   mismatches, require-PAM toggle, backend select (CPU/GPU/Dask/auto),
+   worker count, worker-process toggle, Analyze and Cancel buttons.
+   Live status line reports the running backend, completed/total
+   chunks, and elapsed seconds; the progress bar tracks real chunk
+   completion. Cancellation is cooperative — the scan stops at the
+   next chunk boundary and the app stays usable.
+4. **Alignment Results** — guide/PAM/settings summary, metrics line
+   (sequences, bases, windows, matches, mismatches, method, elapsed),
+   sortable DataTable with score/type/coordinates/strand/MM
+   positions/ambiguity/PAM/matched sequence/guide, min-score,
+   max-mismatch, chromosome, strand, PAM-compatibility, match-type and
+   free-text search filters, click-row candidate detail with
+   highlighted guide-vs-candidate alignment and score breakdown, and
+   working quick CSV/JSON/HTML/PDF export of the current filtered
+   view.
+5. **Biological Scoring** — score formula explanation plus last-run
+   score summary (count, mean, min, max, perfect matches).
+6. **Processing Performance** — measured benchmark runner for
+   cpu/gpu/dask backends, last-run panel (method, status, chunks
+   done/total, elapsed, throughput, peak Python memory, candidates),
+   and a table of every recorded benchmark.
+7. **CPU/GPU Status** — real probes: CPU model/core counts/platform/
+   Python version, GPU detection (backend, device, compute capability,
+   VRAM, or the exact unavailability reason plus requirements),
+   aligner engine selection, numba and dask availability, and what
+   `auto` resolves to. Manual refresh re-probes live.
+8. **Dask Processing** — real scheduler status (workers, threads,
+   memory) plus one-click Dask analysis writing to the same results
+   pipeline.
+9. **Reports and Exports** — write CSV/JSON/HTML/PDF or a full bundle
+   of the last analysis (or current filtered view) to the configured
+   output directory.
+10. **Settings** — chunk size, overlap, Dask workers, worker-process
+    toggle, report output directory; validated on save.
 
 ### Benchmarking (`benchmark.py`, `pipeline.py`)
 * `perf_counter_ns` timing split parse/align/total; `tracemalloc` peak
@@ -230,9 +253,12 @@ python -m pip install -r requirements.txt
 python -m geneware
 ```
 
-Workflow: **Genome** tab → Load Genome (or Load Example) → **Analyzer**
-tab → enter guide, PAM, mismatches, backend → **Analyze** → review in
-**Results** → export in **Reports**.
+Workflow: **Genome Files** → Load Genome (or Load Example) →
+**CRISPR Analysis** → enter guide, PAM, mismatches, backend →
+**Analyze** (live chunk progress; **Cancel** stops cooperatively at
+the next chunk) → review in **Alignment Results** → measure in
+**Processing Performance** → check hardware in **CPU/GPU Status** →
+export in **Reports and Exports**.
 
 ### CLI
 
@@ -260,7 +286,7 @@ Common options: `--chunk-size`, `--overlap`, `--pam`, `--strand`,
 python -m pytest tests -q
 ```
 
-116 tests cover: FASTA parsing edge cases, chunk boundaries, both
+122 tests cover: FASTA parsing edge cases, chunk boundaries, both
 strands, PAM matching/validation, mismatch and ambiguity positions,
 matched/genomic sequence provenance, exact-vs-near typing, deduplication,
 scoring formula/breakdown/ranking, GPU detection contract + CPU fallback
@@ -270,10 +296,15 @@ multi-record/large-FASTA scans, compute_stats correctness, dask scan
 equality with sequential results + pending/completed tracking, CSV/JSON/
 HTML/PDF report generation and contents, pipeline backends +
 memory-error surfacing, benchmark backend field, and Textual app smoke
-tests (tab mounting, genome load, full CPU analysis, results metrics,
+tests (section mounting, genome load, full CPU analysis, results metrics,
 filtering, sorting, candidate detail, quick export, and empty state),
-auto-backend resolution, GPU VRAM field reporting, and Dask
-worker-failure capture / pending-completed accounting.
+auto-backend resolution, GPU VRAM field reporting, Dask worker-failure
+capture / pending-completed accounting, and Day-7 end-to-end tests:
+a synthetic FASTA with a known guide+PAM site verified through analysis
+stats, candidate coordinates/mismatches/PAM/score, all four report
+formats, CLI `analyze --json`, invalid-input rejection, and a full
+dashboard workflow (load -> overview -> analyze -> results -> cancel
+no-op).
 
 ## Coordinate & matching conventions
 

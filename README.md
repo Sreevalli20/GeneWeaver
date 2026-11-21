@@ -1,12 +1,13 @@
-# GeneWeaver — GPU-Accelerated CRISPR Alignment Engine
+# GeneWeaver — CRISPR Guide Search Engine
 
 GeneWeaver is a Python application for CRISPR guide-RNA off-target style
 protospacer search. It parses real FASTA genomes, scans both DNA strands
 for guide matches with configurable PAM and mismatch tolerance, ranks
-hits with an experimental scoring model, and can execute on CPU
-(Numba-JIT engine — the default), GPU (Numba CUDA — verified on the
-RTX 5050 in this repo), or a Dask-distributed CPU cluster — with real
-measured benchmarks and exportable reports.
+hits with an experimental scoring model, and exports CSV/JSON/HTML/PDF
+reports. The default and verified backend is **CPU** (Numba-JIT engine
+with a pure-Python fallback). Optional GPU (Numba CUDA) and Dask
+backends exist but only run when genuinely detected — otherwise the app
+says so plainly.
 
 > **Honesty note:** the off-target *score* is an internally designed
 > heuristic for ranking candidates. It is **not** a medically validated
@@ -16,16 +17,15 @@ measured benchmarks and exportable reports.
 
 ## Environment audit
 
-* **Python:** 3.14.6 (`C:\Python314\python.exe`) — verified, unchanged.
-* **GPU:** NVIDIA GeForce RTX 5050 Laptop (8 GB), driver 592.82,
-  CUDA runtime 13.1 per `nvidia-smi`. Compute capability 12.0 (sm_120).
-* **GPU status on this machine:** **available**. numba 0.68.1
-  JIT-compiles CUDA via LLVM/NVVM (no `nvcc` needed). The CUDA *libraries*
-  (nvvm/nvrtc/cudart/libdevice) are not part of a toolkit install, so
-  geneware auto-links them from the `nvidia-cuda-*-cu12` pip wheels into
-  a CUDA_HOME-layout directory under the user cache before probing
-  (`geneware/gpu.py:_ensure_cuda_home`). `cupy` is not installed; the
-  numba backend is used. Run `python -m geneware.cli gpu-status` to probe.
+* **Python:** 3.14.6 — verified, unchanged.
+* **GPU:** NVIDIA GeForce RTX 5050 Laptop is present, but **GPU compute
+  is currently unavailable on this machine**: an Application Control /
+  WDAC policy blocks the unsigned `numba.cuda` native DLL
+  (`mviewbuf`). `python -m geneware.cli gpu-status` reports this
+  honestly. The CPU path is unaffected and is the default.
+* **CPU engine:** numba 0.68.1 JIT-compiles the scan kernel (no CUDA
+  involved). If numba ever fails to import, the encoded pure-Python
+  fallback is used automatically (~5x slower, identical results).
 
 ### Dependency compatibility (Python 3.14.6, Windows x64)
 
@@ -37,8 +37,8 @@ measured benchmarks and exportable reports.
 | reportlab    | 4.2.5  | PDF report export |
 | dask         | 2024.12.1 | distributed CPU chunk processing |
 | distributed  | 2024.12.1 | LocalCluster backend |
-| numba        | 0.68.1 | GPU backend — works on this machine |
-| nvidia-cuda-nvcc-cu12 / -nvrtc-cu12 / -runtime-cu12 | 12.8.x | provide nvvm/nvrtc/cudart/libdevice DLLs for numba (auto-linked) |
+| numba        | 0.68.1 | CPU JIT engine works; `numba.cuda` DLL blocked by WDAC policy |
+| nvidia-cuda-nvcc-cu12 / -nvrtc-cu12 / -runtime-cu12 | 12.8.x | CUDA libs present, but unusable while `numba.cuda`'s DLLs are policy-blocked |
 | cupy         | not installed | optional alternative GPU backend |
 | pytest       | 8.3.3  | test runner |
 
@@ -118,7 +118,7 @@ pytest.ini         pytest-asyncio configuration
   lowers confidence without being counted as a mismatch. `score_breakdown`
   exposes every penalty component for the selected candidate and reports.
 
-### GPU acceleration (`gpu.py`) — verified working on this laptop
+### GPU acceleration (`gpu.py`) — implemented, currently unavailable here
 * Real detection probe: `numba.cuda` first, `cupy` second; reports
   device name, total and free VRAM (`cuMemGetInfo`), and compute
   capability (RTX 5050, CC 12.0) when present.
@@ -132,6 +132,11 @@ pytest.ini         pytest-asyncio configuration
   the exact IUPAC/PAM semantics, so coordinates, mismatch positions,
   and scores are always consistent with the CPU path.
 * `scan_with_fallback` returns a truthful `'gpu'`/`'cpu'` backend tag.
+* **Status on this machine:** `gpu-status` reports `available: false`
+  because the Application Control policy blocks numba.cuda's native
+  DLLs (`mviewbuf`). GPU execution was verified in an earlier session
+  before the policy applied; it will resume automatically if the DLLs
+  become loadable — no code change needed.
 * **Conservative difference:** the kernels compare exact ACGT codes, so
   windows containing ambiguous (IUPAC) bases can be filtered out even
   when the CPU IUPAC-aware matcher would accept them. On pure-ACGT
@@ -213,21 +218,23 @@ pytest.ini         pytest-asyncio configuration
 * `--backend auto` (CLI and dashboard) resolves to the best genuinely
   available backend at run time: GPU → Dask parallel CPU → sequential
   CPU; `result.backend`/`processing_method` always report what actually
-  ran.
+  ran. On this machine `auto` resolves to CPU because GPU is
+  policy-blocked and Dask is only chosen when it is faster/available.
 
 #### Measured on this machine (20 Mbp synthetic genome, guide 20 nt,
 max_mismatches=0, both strands, chunk_size=1 Mb, overlap=64)
 
 | Backend | Align time | Throughput | Candidates |
 |---------|-----------|------------|------------|
-| CPU numba-JIT (default) | 6.24 s | 3.21 M bases/s | 90 |
-| CPU pure-Python fallback | 27.68 s | 0.72 M bases/s | 90 |
-| GPU numba-cuda (RTX 5050) | 1.98 s | 10.11 M bases/s | 90 |
-| Dask processes x4 (1 Mb chunks) | 11.31 s | 1.77 M bases/s | 90 |
-| Dask threads x8 | 55.44 s | 0.36 M bases/s | 90 |
+| CPU numba-JIT (default) | 4.33 s | 4.62 M bases/s | 90 |
+| CPU pure-Python fallback | ~27 s | ~0.7 M bases/s | 90 |
+| GPU numba-cuda (RTX 5050) | not runnable — DLL policy blocks numba.cuda | — | — |
+| Dask processes/threads | optional; slower than sequential at this size | — | 90 |
 
-All backends returned identical candidate sets on this input. First
-numba scan in a process includes ~1-2 s of JIT compilation.
+The CPU row was re-measured for this release (`bench --backend cpu`);
+the pure-Python figure is from the earlier A/B run. GPU and Dask rows
+are omitted rather than guessed — run `bench --compare` on a machine
+where those backends are usable to get fresh numbers.
 
 ### Reports (`reports.py`)
 * CSV (metadata columns plus ranked candidate details), JSON (full
@@ -323,6 +330,16 @@ no-op).
 
 ## Known limitations
 
+* **GPU is currently blocked on this machine:** an Application Control /
+  WDAC policy prevents `numba.cuda`'s native DLLs (`mviewbuf`) from
+  loading, so `gpu-status` reports GPU unavailable and every backend
+  selection falls back to CPU. The GPU code path is implemented and was
+  benchmarked in an earlier session, but it cannot run while the policy
+  stands. CPU analysis is fully functional and is the default.
+* **BioPython native extensions are policy-blocked:** `Bio.AlignIO`'s
+  `_codonaligner` and `Bio.SeqIO.TwoBitIO`'s `_twoBitIO` DLLs are
+  blocked; `fasta.py` stubs them so FASTA parsing (pure Python) is
+  unaffected. TwoBit/binary formats are unavailable.
 * **GPU vs CPU on ambiguous bases:** the CUDA kernels use exact ACGT
   codes, so windows containing IUPAC ambiguity codes (N, R, ...) are
   conservatively filtered even when the CPU IUPAC-aware matcher would

@@ -168,6 +168,17 @@ _NUMBA_KERNEL_FAILED = False
 _COMPAT_NP = None
 _LUT_NP = None
 
+# Import numba eagerly (once, single-threaded, at module load). Numba's
+# first JIT compile touches ``numba.core.entrypoints``; if the first
+# ``import numba`` happens concurrently on another thread (e.g. the GPU
+# probe inside the Textual worker), the partially-initialised package can
+# surface as ``AttributeError: module 'numba' has no attribute 'core'``.
+# Importing here removes that race. Failure simply disables the JIT path.
+try:
+    import numba as _numba_mod  # noqa: F401
+except Exception:
+    _numba_mod = None
+
 
 def _get_numba_kernel():
     """Return the JIT-compiled scan kernel, or ``None`` when unusable.
@@ -183,11 +194,10 @@ def _get_numba_kernel():
         return None
     if _NUMBA_KERNEL is not None or _NUMBA_KERNEL_FAILED:
         return _NUMBA_KERNEL
-    try:
-        from numba import njit
-    except Exception:
+    if _numba_mod is None:
         _NUMBA_KERNEL_FAILED = True
         return None
+    from numba import njit
 
     @njit(nogil=True)
     def _scan_strand(seq, gcodes, compat, max_mm, i_lo, i_hi, out, count):

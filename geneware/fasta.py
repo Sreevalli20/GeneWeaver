@@ -31,13 +31,16 @@ from Bio.SeqRecord import SeqRecord
 def _import_seqio():
     """Import ``Bio.SeqIO``, working around a known environment issue.
 
-    ``Bio.SeqIO.__init__`` eagerly imports ``Bio.AlignIO``, which loads the
-    compiled ``Bio.Align._codonaligner`` extension. On machines where an
-    Application Control / WDAC policy blocks that unsigned DLL, the whole
-    ``Bio.SeqIO`` import fails even though FASTA parsing never touches
-    alignment code. When (and only when) the real import fails, a stub
-    ``Bio.AlignIO`` module is registered so ``Bio.SeqIO`` can load; the
-    stub is never used by the FASTA code paths.
+    ``Bio.SeqIO.__init__`` eagerly imports ``Bio.AlignIO`` and several
+    binary-format submodules (e.g. ``Bio.SeqIO.TwoBitIO``), which load
+    compiled extension DLLs (``_codonaligner``, ``_twoBitIO``). On
+    machines where an Application Control / WDAC policy blocks those
+    unsigned DLLs, the whole ``Bio.SeqIO`` import fails even though
+    FASTA parsing never touches them. When (and only when) a real
+    import fails, stub modules are registered in ``sys.modules`` so
+    ``Bio.SeqIO`` can load; the stubs are never used by the FASTA code
+    paths (FASTA goes through ``Bio.SeqIO.FastaIO``, a pure-Python
+    parser).
     """
     try:
         import Bio.AlignIO  # noqa: F401
@@ -49,6 +52,22 @@ def _import_seqio():
         stub._FormatToIterator = {}
         stub._FormatToWriter = {}
         sys.modules["Bio.AlignIO"] = stub
+    try:
+        from Bio.SeqIO import TwoBitIO  # noqa: F401
+    except ImportError:
+        stub = types.ModuleType("Bio.SeqIO.TwoBitIO")
+
+        class _StubIterator:
+            def __init__(self, *args, **kwargs):
+                raise FastaParseError("TwoBit format is unavailable in this environment")
+
+        class _StubWriter:
+            def __init__(self, *args, **kwargs):
+                raise FastaParseError("TwoBit format is unavailable in this environment")
+
+        stub.TwoBitIterator = _StubIterator
+        stub.TwoBitWriter = _StubWriter
+        sys.modules["Bio.SeqIO.TwoBitIO"] = stub
     from Bio import SeqIO
 
     return SeqIO

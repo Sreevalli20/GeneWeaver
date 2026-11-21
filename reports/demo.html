@@ -1,0 +1,1173 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<title>GeneWeaver Analysis Report</title>
+<style>
+body { font-family: Segoe UI, Arial, sans-serif; margin: 2rem; color: #1c2430; }
+h1 { color: #1f4e79; } h2 { color: #2e75b6; margin-top: 1.6rem; }
+table { border-collapse: collapse; width: 100%; margin: .6rem 0; }
+th, td { border: 1px solid #b9c6d8; padding: .3rem .5rem; font-size: .85rem; }
+th { background: #dce6f2; text-align: left; }
+tr:nth-child(even) td { background: #f4f7fb; }
+.meta td:first-child { font-weight: 600; width: 16rem; }
+.note { background: #fff4e5; border: 1px solid #e0a458; padding: .6rem .8rem;
+        border-radius: 4px; }
+code { background: #eef1f5; padding: 0 .25rem; overflow-wrap: anywhere; }
+.cand { margin: .5rem 0; border: 1px solid #c7d3e3; padding: .5rem .7rem;
+        border-radius: 4px; }
+.alignment { margin-top: .5rem; font-family: Consolas, monospace; }
+.aln-row { white-space: pre-wrap; }
+.lbl { color: #51606f; }
+.match { color: #1e7b34; font-weight: bold; }
+.mismatch { color: #b42318; font-weight: bold; text-decoration: underline; }
+.ambiguous { color: #b54708; font-weight: bold; }
+.marker { color: #b42318; }
+.note-small { color: #667085; font-family: Segoe UI, Arial, sans-serif; }
+</style></head><body>
+<h1>GeneWeaver — CRISPR Alignment Report</h1>
+<p class="note"><strong>Experimental tool.</strong> The score column uses an
+internally designed heuristic ranking score; it is <em>not</em> a validated
+biological off-target prediction and does not prove that a CRISPR mutation
+will occur.</p>
+
+<h2>Analysis settings</h2>
+<table class="meta">
+<tr><td>FASTA filename</td><td><code>example.fasta</code></td></tr>
+<tr><td>FASTA path</td><td><code>data\example.fasta</code></td></tr>
+<tr><td>Guide (5'→3')</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>PAM patterns</td><td><code>ACG</code></td></tr>
+<tr><td>Strands</td><td><code>+,-</code></td></tr>
+<tr><td>Max mismatches</td><td>1</td></tr>
+<tr><td>Require PAM</td><td>True</td></tr>
+<tr><td>Backend</td><td><code>cpu</code></td></tr>
+<tr><td>Processing method</td><td><code>cpu/sequential</code></td></tr>
+<tr><td>Preprocess / scan / total time</td><td>0.000515 s / 2.211770 s / 2.212284 s</td></tr>
+<tr><td>Sequences processed</td><td>2</td></tr>
+<tr><td>Candidate matches exported</td><td>54</td></tr>
+<tr><td>Matches found before export</td><td>54</td></tr>
+</table>
+
+<h2>Score model</h2>
+<p><code>Experimental ranking score (geneware-heuristic-v1), NOT a validated biological prediction.
+  start at 100
+  - 10 per mismatch
+  - 5 extra per mismatch in the last 8 protospacer positions (PAM-proximal seed region)
+  - 15 if PAM incompatible with all patterns
+  - 2 per compatible IUPAC-ambiguous position
+  clamped to [0, 100]; higher is better.</code></p>
+<table class="meta">
+<tr><td>Count</td><td>54</td></tr>
+<tr><td>Mean score</td><td>100.0</td></tr>
+<tr><td>Min / Max score</td><td>100.0 / 100.0</td></tr>
+<tr><td>Perfect scores (100)</td><td>54</td></tr>
+</table>
+
+<h2>Sequence statistics</h2>
+<table class="meta">
+<tr><td>Records</td><td>2</td></tr>
+<tr><td>Total bases</td><td>256</td></tr>
+<tr><td>GC %</td><td>50.0%</td></tr>
+<tr><td>Ambiguous bases</td><td>4</td></tr>
+</table>
+
+<h2>Scan statistics</h2>
+<table class="meta">
+<tr><td>Bases processed</td><td>256</td></tr>
+<tr><td>Windows evaluated</td><td>424</td></tr>
+<tr><td>Chunks scanned</td><td>2</td></tr>
+<tr><td>Candidates (deduplicated)</td><td>54</td></tr>
+</table>
+
+<h2>Backend details</h2>
+<table class="meta"><tr><td>chunks_completed</td><td><code>2</code></td></tr><tr><td>chunks_total</td><td><code>2</code></td></tr><tr><td>memory_peak_bytes</td><td><code>28144114</code></td></tr><tr><td>mode</td><td><code>sequential</code></td></tr><tr><td>preprocess_seconds</td><td><code>0.0005145999602973461</code></td></tr><tr><td>total_seconds</td><td><code>2.212284400011413</code></td></tr><tr><td>workers</td><td><code>1</code></td></tr></table>
+
+<h2>Candidates (54)</h2>
+<table><thead><tr><th>#</th><th>Score</th><th>Type</th><th>Chr</th><th>Start</th><th>End</th><th>PAM coords</th><th>Strand</th><th>MM</th><th>MM pos</th><th>Ambig pos</th><th>PAM</th><th>PAM ok</th><th>Matched</th><th>Genomic</th></tr></thead><tbody><tr><td>1</td><td>100.0</td><td>exact</td><td>chr_demo1</td><td>0</td><td>20</td><td>20..23</td><td>+</td><td>0</td><td>-</td><td>-</td><td>ACG</td><td>yes</td><td><code>ACGTACGTACGTACGTACGT</code></td><td><code>ACGTACGTACGTACGTACGT</code></td></tr><tr><td>2</td><td>100.0</td><td>exact</td><td>chr_demo1</td><td>4</td><td>24</td><td>24..27</td><td>+</td><td>0</td><td>-</td><td>-</td><td>ACG</td><td>yes</td><td><code>ACGTACGTACGTACGTACGT</code></td><td><code>ACGTACGTACGTACGTACGT</code></td></tr><tr><td>3</td><td>100.0</td><td>exact</td><td>chr_demo1</td><td>4</td><td>24</td><td>1..4</td><td>-</td><td>0</td><td>-</td><td>-</td><td>ACG</td><td>yes</td><td><code>ACGTACGTACGTACGTACGT</code></td><td><code>ACGTACGTACGTACGTACGT</code></td></tr><tr><td>4</td><td>100.0</td><td>exact</td><td>chr_demo1</td><td>8</td><td>28</td><td>28..31</td><td>+</td><td>0</td><td>-</td><td>-</td><td>ACG</td><td>yes</td><td><code>ACGTACGTACGTACGTACGT</code></td><td><code>ACGTACGTACGTACGTACGT</code></td></tr><tr><td>5</td><td>100.0</td><td>exact</td><td>chr_demo1</td><td>8</td><td>28</td><td>5..8</td><td>-</td><td>0</td><td>-</td><td>-</td><td>ACG</td><td>yes</td><td><code>ACGTACGTACGTACGTACGT</code></td><td><code>ACGTACGTACGTACGTACGT</code></td></tr><tr><td>6</td><td>100.0</td><td>exact</td><td>chr_demo1</td><td>12</td><td>32</td><td>32..35</td><td>+</td><td>0</td><td>-</td><td>-</td><td>ACG</td><td>yes</td><td><code>ACGTACGTACGTACGTACGT</code></td><td><code>ACGTACGTACGTACGTACGT</code></td></tr><tr><td>7</td><td>100.0</td><td>exact</td><td>chr_demo1</td><td>12</td><td>32</td><td>9..12</td><td>-</td><td>0</td><td>-</td><td>-</td><td>ACG</td><td>yes</td><td><code>ACGTACGTACGTACGTACGT</code></td><td><code>ACGTACGTACGTACGTACGT</code></td></tr><tr><td>8</td><td>100.0</td><td>exact</td><td>chr_demo1</td><td>16</td><td>36</td><td>36..39</td><td>+</td><td>0</td><td>-</td><td>-</td><td>ACG</td><td>yes</td><td><code>ACGTACGTACGTACGTACGT</code></td><td><code>ACGTACGTACGTACGTACGT</code></td></tr><tr><td>9</td><td>100.0</td><td>exact</td><td>chr_demo1</td><td>16</td><td>36</td><td>13..16</td><td>-</td><td>0</td><td>-</td><td>-</td><td>ACG</td><td>yes</td><td><code>ACGTACGTACGTACGTACGT</code></td><td><code>ACGTACGTACGTACGTACGT</code></td></tr><tr><td>10</td><td>100.0</td><td>exact</td><td>chr_demo1</td><td>20</td><td>40</td><td>40..43</td><td>+</td><td>0</td><td>-</td><td>-</td><td>ACG</td><td>yes</td><td><code>ACGTACGTACGTACGTACGT</code></td><td><code>ACGTACGTACGTACGTACGT</code></td></tr><tr><td>11</td><td>100.0</td><td>exact</td><td>chr_demo1</td><td>20</td><td>40</td><td>17..20</td><td>-</td><td>0</td><td>-</td><td>-</td><td>ACG</td><td>yes</td><td><code>ACGTACGTACGTACGTACGT</code></td><td><code>ACGTACGTACGTACGTACGT</code></td></tr><tr><td>12</td><td>100.0</td><td>exact</td><td>chr_demo1</td><td>24</td><td>44</td><td>44..47</td><td>+</td><td>0</td><td>-</td><td>-</td><td>ACG</td><td>yes</td><td><code>ACGTACGTACGTACGTACGT</code></td><td><code>ACGTACGTACGTACGTACGT</code></td></tr><tr><td>13</td><td>100.0</td><td>exact</td><td>chr_demo1</td><td>24</td><td>44</td><td>21..24</td><td>-</td><td>0</td><td>-</td><td>-</td><td>ACG</td><td>yes</td><td><code>ACGTACGTACGTACGTACGT</code></td><td><code>ACGTACGTACGTACGTACGT</code></td></tr><tr><td>14</td><td>100.0</td><td>exact</td><td>chr_demo1</td><td>28</td><td>48</td><td>48..51</td><td>+</td><td>0</td><td>-</td><td>-</td><td>ACG</td><td>yes</td><td><code>ACGTACGTACGTACGTACGT</code></td><td><code>ACGTACGTACGTACGTACGT</code></td></tr><tr><td>15</td><td>100.0</td><td>exact</td><td>chr_demo1</td><td>28</td><td>48</td><td>25..28</td><td>-</td><td>0</td><td>-</td><td>-</td><td>ACG</td><td>yes</td><td><code>ACGTACGTACGTACGTACGT</code></td><td><code>ACGTACGTACGTACGTACGT</code></td></tr><tr><td>16</td><td>100.0</td><td>exact</td><td>chr_demo1</td><td>32</td><td>52</td><td>52..55</td><td>+</td><td>0</td><td>-</td><td>-</td><td>ACG</td><td>yes</td><td><code>ACGTACGTACGTACGTACGT</code></td><td><code>ACGTACGTACGTACGTACGT</code></td></tr><tr><td>17</td><td>100.0</td><td>exact</td><td>chr_demo1</td><td>32</td><td>52</td><td>29..32</td><td>-</td><td>0</td><td>-</td><td>-</td><td>ACG</td><td>yes</td><td><code>ACGTACGTACGTACGTACGT</code></td><td><code>ACGTACGTACGTACGTACGT</code></td></tr><tr><td>18</td><td>100.0</td><td>exact</td><td>chr_demo1</td><td>36</td><td>56</td><td>56..59</td><td>+</td><td>0</td><td>-</td><td>-</td><td>ACG</td><td>yes</td><td><code>ACGTACGTACGTACGTACGT</code></td><td><code>ACGTACGTACGTACGTACGT</code></td></tr><tr><td>19</td><td>100.0</td><td>exact</td><td>chr_demo1</td><td>36</td><td>56</td><td>33..36</td><td>-</td><td>0</td><td>-</td><td>-</td><td>ACG</td><td>yes</td><td><code>ACGTACGTACGTACGTACGT</code></td><td><code>ACGTACGTACGTACGTACGT</code></td></tr><tr><td>20</td><td>100.0</td><td>exact</td><td>chr_demo1</td><td>40</td><td>60</td><td>60..63</td><td>+</td><td>0</td><td>-</td><td>-</td><td>ACG</td><td>yes</td><td><code>ACGTACGTACGTACGTACGT</code></td><td><code>ACGTACGTACGTACGTACGT</code></td></tr><tr><td>21</td><td>100.0</td><td>exact</td><td>chr_demo1</td><td>40</td><td>60</td><td>37..40</td><td>-</td><td>0</td><td>-</td><td>-</td><td>ACG</td><td>yes</td><td><code>ACGTACGTACGTACGTACGT</code></td><td><code>ACGTACGTACGTACGTACGT</code></td></tr><tr><td>22</td><td>100.0</td><td>exact</td><td>chr_demo1</td><td>44</td><td>64</td><td>64..67</td><td>+</td><td>0</td><td>-</td><td>-</td><td>ACG</td><td>yes</td><td><code>ACGTACGTACGTACGTACGT</code></td><td><code>ACGTACGTACGTACGTACGT</code></td></tr><tr><td>23</td><td>100.0</td><td>exact</td><td>chr_demo1</td><td>44</td><td>64</td><td>41..44</td><td>-</td><td>0</td><td>-</td><td>-</td><td>ACG</td><td>yes</td><td><code>ACGTACGTACGTACGTACGT</code></td><td><code>ACGTACGTACGTACGTACGT</code></td></tr><tr><td>24</td><td>100.0</td><td>exact</td><td>chr_demo1</td><td>48</td><td>68</td><td>68..71</td><td>+</td><td>0</td><td>-</td><td>-</td><td>ACG</td><td>yes</td><td><code>ACGTACGTACGTACGTACGT</code></td><td><code>ACGTACGTACGTACGTACGT</code></td></tr><tr><td>25</td><td>100.0</td><td>exact</td><td>chr_demo1</td><td>48</td><td>68</td><td>45..48</td><td>-</td><td>0</td><td>-</td><td>-</td><td>ACG</td><td>yes</td><td><code>ACGTACGTACGTACGTACGT</code></td><td><code>ACGTACGTACGTACGTACGT</code></td></tr><tr><td>26</td><td>100.0</td><td>exact</td><td>chr_demo1</td><td>52</td><td>72</td><td>72..75</td><td>+</td><td>0</td><td>-</td><td>-</td><td>ACG</td><td>yes</td><td><code>ACGTACGTACGTACGTACGT</code></td><td><code>ACGTACGTACGTACGTACGT</code></td></tr><tr><td>27</td><td>100.0</td><td>exact</td><td>chr_demo1</td><td>52</td><td>72</td><td>49..52</td><td>-</td><td>0</td><td>-</td><td>-</td><td>ACG</td><td>yes</td><td><code>ACGTACGTACGTACGTACGT</code></td><td><code>ACGTACGTACGTACGTACGT</code></td></tr><tr><td>28</td><td>100.0</td><td>exact</td><td>chr_demo1</td><td>56</td><td>76</td><td>76..79</td><td>+</td><td>0</td><td>-</td><td>-</td><td>ACG</td><td>yes</td><td><code>ACGTACGTACGTACGTACGT</code></td><td><code>ACGTACGTACGTACGTACGT</code></td></tr><tr><td>29</td><td>100.0</td><td>exact</td><td>chr_demo1</td><td>56</td><td>76</td><td>53..56</td><td>-</td><td>0</td><td>-</td><td>-</td><td>ACG</td><td>yes</td><td><code>ACGTACGTACGTACGTACGT</code></td><td><code>ACGTACGTACGTACGTACGT</code></td></tr><tr><td>30</td><td>100.0</td><td>exact</td><td>chr_demo1</td><td>60</td><td>80</td><td>80..83</td><td>+</td><td>0</td><td>-</td><td>-</td><td>ACG</td><td>yes</td><td><code>ACGTACGTACGTACGTACGT</code></td><td><code>ACGTACGTACGTACGTACGT</code></td></tr><tr><td>31</td><td>100.0</td><td>exact</td><td>chr_demo1</td><td>60</td><td>80</td><td>57..60</td><td>-</td><td>0</td><td>-</td><td>-</td><td>ACG</td><td>yes</td><td><code>ACGTACGTACGTACGTACGT</code></td><td><code>ACGTACGTACGTACGTACGT</code></td></tr><tr><td>32</td><td>100.0</td><td>exact</td><td>chr_demo1</td><td>64</td><td>84</td><td>84..87</td><td>+</td><td>0</td><td>-</td><td>-</td><td>ACG</td><td>yes</td><td><code>ACGTACGTACGTACGTACGT</code></td><td><code>ACGTACGTACGTACGTACGT</code></td></tr><tr><td>33</td><td>100.0</td><td>exact</td><td>chr_demo1</td><td>64</td><td>84</td><td>61..64</td><td>-</td><td>0</td><td>-</td><td>-</td><td>ACG</td><td>yes</td><td><code>ACGTACGTACGTACGTACGT</code></td><td><code>ACGTACGTACGTACGTACGT</code></td></tr><tr><td>34</td><td>100.0</td><td>exact</td><td>chr_demo1</td><td>68</td><td>88</td><td>88..91</td><td>+</td><td>0</td><td>-</td><td>-</td><td>ACG</td><td>yes</td><td><code>ACGTACGTACGTACGTACGT</code></td><td><code>ACGTACGTACGTACGTACGT</code></td></tr><tr><td>35</td><td>100.0</td><td>exact</td><td>chr_demo1</td><td>68</td><td>88</td><td>65..68</td><td>-</td><td>0</td><td>-</td><td>-</td><td>ACG</td><td>yes</td><td><code>ACGTACGTACGTACGTACGT</code></td><td><code>ACGTACGTACGTACGTACGT</code></td></tr><tr><td>36</td><td>100.0</td><td>exact</td><td>chr_demo1</td><td>72</td><td>92</td><td>92..95</td><td>+</td><td>0</td><td>-</td><td>-</td><td>ACG</td><td>yes</td><td><code>ACGTACGTACGTACGTACGT</code></td><td><code>ACGTACGTACGTACGTACGT</code></td></tr><tr><td>37</td><td>100.0</td><td>exact</td><td>chr_demo1</td><td>72</td><td>92</td><td>69..72</td><td>-</td><td>0</td><td>-</td><td>-</td><td>ACG</td><td>yes</td><td><code>ACGTACGTACGTACGTACGT</code></td><td><code>ACGTACGTACGTACGTACGT</code></td></tr><tr><td>38</td><td>100.0</td><td>exact</td><td>chr_demo1</td><td>76</td><td>96</td><td>96..99</td><td>+</td><td>0</td><td>-</td><td>-</td><td>ACG</td><td>yes</td><td><code>ACGTACGTACGTACGTACGT</code></td><td><code>ACGTACGTACGTACGTACGT</code></td></tr><tr><td>39</td><td>100.0</td><td>exact</td><td>chr_demo1</td><td>76</td><td>96</td><td>73..76</td><td>-</td><td>0</td><td>-</td><td>-</td><td>ACG</td><td>yes</td><td><code>ACGTACGTACGTACGTACGT</code></td><td><code>ACGTACGTACGTACGTACGT</code></td></tr><tr><td>40</td><td>100.0</td><td>exact</td><td>chr_demo1</td><td>80</td><td>100</td><td>100..103</td><td>+</td><td>0</td><td>-</td><td>-</td><td>ACG</td><td>yes</td><td><code>ACGTACGTACGTACGTACGT</code></td><td><code>ACGTACGTACGTACGTACGT</code></td></tr><tr><td>41</td><td>100.0</td><td>exact</td><td>chr_demo1</td><td>80</td><td>100</td><td>77..80</td><td>-</td><td>0</td><td>-</td><td>-</td><td>ACG</td><td>yes</td><td><code>ACGTACGTACGTACGTACGT</code></td><td><code>ACGTACGTACGTACGTACGT</code></td></tr><tr><td>42</td><td>100.0</td><td>exact</td><td>chr_demo1</td><td>84</td><td>104</td><td>104..107</td><td>+</td><td>0</td><td>-</td><td>-</td><td>ACG</td><td>yes</td><td><code>ACGTACGTACGTACGTACGT</code></td><td><code>ACGTACGTACGTACGTACGT</code></td></tr><tr><td>43</td><td>100.0</td><td>exact</td><td>chr_demo1</td><td>84</td><td>104</td><td>81..84</td><td>-</td><td>0</td><td>-</td><td>-</td><td>ACG</td><td>yes</td><td><code>ACGTACGTACGTACGTACGT</code></td><td><code>ACGTACGTACGTACGTACGT</code></td></tr><tr><td>44</td><td>100.0</td><td>exact</td><td>chr_demo1</td><td>88</td><td>108</td><td>108..111</td><td>+</td><td>0</td><td>-</td><td>-</td><td>ACG</td><td>yes</td><td><code>ACGTACGTACGTACGTACGT</code></td><td><code>ACGTACGTACGTACGTACGT</code></td></tr><tr><td>45</td><td>100.0</td><td>exact</td><td>chr_demo1</td><td>88</td><td>108</td><td>85..88</td><td>-</td><td>0</td><td>-</td><td>-</td><td>ACG</td><td>yes</td><td><code>ACGTACGTACGTACGTACGT</code></td><td><code>ACGTACGTACGTACGTACGT</code></td></tr><tr><td>46</td><td>100.0</td><td>exact</td><td>chr_demo1</td><td>92</td><td>112</td><td>112..115</td><td>+</td><td>0</td><td>-</td><td>-</td><td>ACG</td><td>yes</td><td><code>ACGTACGTACGTACGTACGT</code></td><td><code>ACGTACGTACGTACGTACGT</code></td></tr><tr><td>47</td><td>100.0</td><td>exact</td><td>chr_demo1</td><td>92</td><td>112</td><td>89..92</td><td>-</td><td>0</td><td>-</td><td>-</td><td>ACG</td><td>yes</td><td><code>ACGTACGTACGTACGTACGT</code></td><td><code>ACGTACGTACGTACGTACGT</code></td></tr><tr><td>48</td><td>100.0</td><td>exact</td><td>chr_demo1</td><td>96</td><td>116</td><td>116..119</td><td>+</td><td>0</td><td>-</td><td>-</td><td>ACG</td><td>yes</td><td><code>ACGTACGTACGTACGTACGT</code></td><td><code>ACGTACGTACGTACGTACGT</code></td></tr><tr><td>49</td><td>100.0</td><td>exact</td><td>chr_demo1</td><td>96</td><td>116</td><td>93..96</td><td>-</td><td>0</td><td>-</td><td>-</td><td>ACG</td><td>yes</td><td><code>ACGTACGTACGTACGTACGT</code></td><td><code>ACGTACGTACGTACGTACGT</code></td></tr><tr><td>50</td><td>100.0</td><td>exact</td><td>chr_demo1</td><td>100</td><td>120</td><td>120..123</td><td>+</td><td>0</td><td>-</td><td>-</td><td>ACG</td><td>yes</td><td><code>ACGTACGTACGTACGTACGT</code></td><td><code>ACGTACGTACGTACGTACGT</code></td></tr><tr><td>51</td><td>100.0</td><td>exact</td><td>chr_demo1</td><td>100</td><td>120</td><td>97..100</td><td>-</td><td>0</td><td>-</td><td>-</td><td>ACG</td><td>yes</td><td><code>ACGTACGTACGTACGTACGT</code></td><td><code>ACGTACGTACGTACGTACGT</code></td></tr><tr><td>52</td><td>100.0</td><td>exact</td><td>chr_demo1</td><td>104</td><td>124</td><td>124..127</td><td>+</td><td>0</td><td>-</td><td>-</td><td>ACG</td><td>yes</td><td><code>ACGTACGTACGTACGTACGT</code></td><td><code>ACGTACGTACGTACGTACGT</code></td></tr><tr><td>53</td><td>100.0</td><td>exact</td><td>chr_demo1</td><td>104</td><td>124</td><td>101..104</td><td>-</td><td>0</td><td>-</td><td>-</td><td>ACG</td><td>yes</td><td><code>ACGTACGTACGTACGTACGT</code></td><td><code>ACGTACGTACGTACGTACGT</code></td></tr><tr><td>54</td><td>100.0</td><td>exact</td><td>chr_demo1</td><td>108</td><td>128</td><td>105..108</td><td>-</td><td>0</td><td>-</td><td>-</td><td>ACG</td><td>yes</td><td><code>ACGTACGTACGTACGTACGT</code></td><td><code>ACGTACGTACGTACGTACGT</code></td></tr></tbody></table>
+
+<h2>Candidate details and alignments</h2>
+
+<details class="cand">
+<summary>#1 chr_demo1:0-20 +
+ score=100.0 type=exact</summary>
+<table class="meta">
+<tr><td>Guide (5'→3')</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Matched sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Plus-strand genomic sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>PAM (candidate strand)</td><td><code>ACG</code></td></tr>
+<tr><td>PAM plus-strand footprint</td><td><code>ACG</code></td></tr>
+<tr><td>Coordinates</td><td>0..20 (0-based half-open); PAM 20..23</td></tr>
+<tr><td>Strand</td><td>+</td></tr>
+<tr><td>Mismatch count</td><td>0</td></tr>
+<tr><td>Mismatch positions</td><td>-</td></tr>
+<tr><td>Ambiguous positions</td><td>-</td></tr>
+<tr><td>PAM compatible</td><td>yes</td></tr>
+<tr><td>Experimental score</td><td>100.0000</td></tr>
+<tr><td>Score breakdown</td><td><code>mismatches=0, mismatch_penalty=0.0, seed_mismatches=0, seed_penalty=0.0, pam_compatible=True, pam_penalty=0.0, ambiguous_positions=[], ambiguity_penalty=0.0, raw_score=100.0</code></td></tr>
+</table>
+<div class='alignment'><div class='aln-row'><span class='lbl'>guide   </span><code><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span></code></div><div class='aln-row'><span class='lbl'>candidate</span><code><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span></code></div><div class='aln-row marker'><code>                    </code></div><div class='aln-row'><span class='lbl'>PAM      </span><code>ACG</code> <span class='note-small'>(candidate strand; plus-strand footprint ACG)</span></div></div>
+</details>
+<details class="cand">
+<summary>#2 chr_demo1:4-24 +
+ score=100.0 type=exact</summary>
+<table class="meta">
+<tr><td>Guide (5'→3')</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Matched sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Plus-strand genomic sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>PAM (candidate strand)</td><td><code>ACG</code></td></tr>
+<tr><td>PAM plus-strand footprint</td><td><code>ACG</code></td></tr>
+<tr><td>Coordinates</td><td>4..24 (0-based half-open); PAM 24..27</td></tr>
+<tr><td>Strand</td><td>+</td></tr>
+<tr><td>Mismatch count</td><td>0</td></tr>
+<tr><td>Mismatch positions</td><td>-</td></tr>
+<tr><td>Ambiguous positions</td><td>-</td></tr>
+<tr><td>PAM compatible</td><td>yes</td></tr>
+<tr><td>Experimental score</td><td>100.0000</td></tr>
+<tr><td>Score breakdown</td><td><code>mismatches=0, mismatch_penalty=0.0, seed_mismatches=0, seed_penalty=0.0, pam_compatible=True, pam_penalty=0.0, ambiguous_positions=[], ambiguity_penalty=0.0, raw_score=100.0</code></td></tr>
+</table>
+<div class='alignment'><div class='aln-row'><span class='lbl'>guide   </span><code><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span></code></div><div class='aln-row'><span class='lbl'>candidate</span><code><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span></code></div><div class='aln-row marker'><code>                    </code></div><div class='aln-row'><span class='lbl'>PAM      </span><code>ACG</code> <span class='note-small'>(candidate strand; plus-strand footprint ACG)</span></div></div>
+</details>
+<details class="cand">
+<summary>#3 chr_demo1:4-24 -
+ score=100.0 type=exact</summary>
+<table class="meta">
+<tr><td>Guide (5'→3')</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Matched sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Plus-strand genomic sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>PAM (candidate strand)</td><td><code>ACG</code></td></tr>
+<tr><td>PAM plus-strand footprint</td><td><code>CGT</code></td></tr>
+<tr><td>Coordinates</td><td>4..24 (0-based half-open); PAM 1..4</td></tr>
+<tr><td>Strand</td><td>-</td></tr>
+<tr><td>Mismatch count</td><td>0</td></tr>
+<tr><td>Mismatch positions</td><td>-</td></tr>
+<tr><td>Ambiguous positions</td><td>-</td></tr>
+<tr><td>PAM compatible</td><td>yes</td></tr>
+<tr><td>Experimental score</td><td>100.0000</td></tr>
+<tr><td>Score breakdown</td><td><code>mismatches=0, mismatch_penalty=0.0, seed_mismatches=0, seed_penalty=0.0, pam_compatible=True, pam_penalty=0.0, ambiguous_positions=[], ambiguity_penalty=0.0, raw_score=100.0</code></td></tr>
+</table>
+<div class='alignment'><div class='aln-row'><span class='lbl'>guide   </span><code><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span></code></div><div class='aln-row'><span class='lbl'>candidate</span><code><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span></code></div><div class='aln-row marker'><code>                    </code></div><div class='aln-row'><span class='lbl'>PAM      </span><code>ACG</code> <span class='note-small'>(candidate strand; plus-strand footprint CGT)</span></div></div>
+</details>
+<details class="cand">
+<summary>#4 chr_demo1:8-28 +
+ score=100.0 type=exact</summary>
+<table class="meta">
+<tr><td>Guide (5'→3')</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Matched sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Plus-strand genomic sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>PAM (candidate strand)</td><td><code>ACG</code></td></tr>
+<tr><td>PAM plus-strand footprint</td><td><code>ACG</code></td></tr>
+<tr><td>Coordinates</td><td>8..28 (0-based half-open); PAM 28..31</td></tr>
+<tr><td>Strand</td><td>+</td></tr>
+<tr><td>Mismatch count</td><td>0</td></tr>
+<tr><td>Mismatch positions</td><td>-</td></tr>
+<tr><td>Ambiguous positions</td><td>-</td></tr>
+<tr><td>PAM compatible</td><td>yes</td></tr>
+<tr><td>Experimental score</td><td>100.0000</td></tr>
+<tr><td>Score breakdown</td><td><code>mismatches=0, mismatch_penalty=0.0, seed_mismatches=0, seed_penalty=0.0, pam_compatible=True, pam_penalty=0.0, ambiguous_positions=[], ambiguity_penalty=0.0, raw_score=100.0</code></td></tr>
+</table>
+<div class='alignment'><div class='aln-row'><span class='lbl'>guide   </span><code><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span></code></div><div class='aln-row'><span class='lbl'>candidate</span><code><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span></code></div><div class='aln-row marker'><code>                    </code></div><div class='aln-row'><span class='lbl'>PAM      </span><code>ACG</code> <span class='note-small'>(candidate strand; plus-strand footprint ACG)</span></div></div>
+</details>
+<details class="cand">
+<summary>#5 chr_demo1:8-28 -
+ score=100.0 type=exact</summary>
+<table class="meta">
+<tr><td>Guide (5'→3')</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Matched sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Plus-strand genomic sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>PAM (candidate strand)</td><td><code>ACG</code></td></tr>
+<tr><td>PAM plus-strand footprint</td><td><code>CGT</code></td></tr>
+<tr><td>Coordinates</td><td>8..28 (0-based half-open); PAM 5..8</td></tr>
+<tr><td>Strand</td><td>-</td></tr>
+<tr><td>Mismatch count</td><td>0</td></tr>
+<tr><td>Mismatch positions</td><td>-</td></tr>
+<tr><td>Ambiguous positions</td><td>-</td></tr>
+<tr><td>PAM compatible</td><td>yes</td></tr>
+<tr><td>Experimental score</td><td>100.0000</td></tr>
+<tr><td>Score breakdown</td><td><code>mismatches=0, mismatch_penalty=0.0, seed_mismatches=0, seed_penalty=0.0, pam_compatible=True, pam_penalty=0.0, ambiguous_positions=[], ambiguity_penalty=0.0, raw_score=100.0</code></td></tr>
+</table>
+<div class='alignment'><div class='aln-row'><span class='lbl'>guide   </span><code><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span></code></div><div class='aln-row'><span class='lbl'>candidate</span><code><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span></code></div><div class='aln-row marker'><code>                    </code></div><div class='aln-row'><span class='lbl'>PAM      </span><code>ACG</code> <span class='note-small'>(candidate strand; plus-strand footprint CGT)</span></div></div>
+</details>
+<details class="cand">
+<summary>#6 chr_demo1:12-32 +
+ score=100.0 type=exact</summary>
+<table class="meta">
+<tr><td>Guide (5'→3')</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Matched sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Plus-strand genomic sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>PAM (candidate strand)</td><td><code>ACG</code></td></tr>
+<tr><td>PAM plus-strand footprint</td><td><code>ACG</code></td></tr>
+<tr><td>Coordinates</td><td>12..32 (0-based half-open); PAM 32..35</td></tr>
+<tr><td>Strand</td><td>+</td></tr>
+<tr><td>Mismatch count</td><td>0</td></tr>
+<tr><td>Mismatch positions</td><td>-</td></tr>
+<tr><td>Ambiguous positions</td><td>-</td></tr>
+<tr><td>PAM compatible</td><td>yes</td></tr>
+<tr><td>Experimental score</td><td>100.0000</td></tr>
+<tr><td>Score breakdown</td><td><code>mismatches=0, mismatch_penalty=0.0, seed_mismatches=0, seed_penalty=0.0, pam_compatible=True, pam_penalty=0.0, ambiguous_positions=[], ambiguity_penalty=0.0, raw_score=100.0</code></td></tr>
+</table>
+<div class='alignment'><div class='aln-row'><span class='lbl'>guide   </span><code><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span></code></div><div class='aln-row'><span class='lbl'>candidate</span><code><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span></code></div><div class='aln-row marker'><code>                    </code></div><div class='aln-row'><span class='lbl'>PAM      </span><code>ACG</code> <span class='note-small'>(candidate strand; plus-strand footprint ACG)</span></div></div>
+</details>
+<details class="cand">
+<summary>#7 chr_demo1:12-32 -
+ score=100.0 type=exact</summary>
+<table class="meta">
+<tr><td>Guide (5'→3')</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Matched sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Plus-strand genomic sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>PAM (candidate strand)</td><td><code>ACG</code></td></tr>
+<tr><td>PAM plus-strand footprint</td><td><code>CGT</code></td></tr>
+<tr><td>Coordinates</td><td>12..32 (0-based half-open); PAM 9..12</td></tr>
+<tr><td>Strand</td><td>-</td></tr>
+<tr><td>Mismatch count</td><td>0</td></tr>
+<tr><td>Mismatch positions</td><td>-</td></tr>
+<tr><td>Ambiguous positions</td><td>-</td></tr>
+<tr><td>PAM compatible</td><td>yes</td></tr>
+<tr><td>Experimental score</td><td>100.0000</td></tr>
+<tr><td>Score breakdown</td><td><code>mismatches=0, mismatch_penalty=0.0, seed_mismatches=0, seed_penalty=0.0, pam_compatible=True, pam_penalty=0.0, ambiguous_positions=[], ambiguity_penalty=0.0, raw_score=100.0</code></td></tr>
+</table>
+<div class='alignment'><div class='aln-row'><span class='lbl'>guide   </span><code><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span></code></div><div class='aln-row'><span class='lbl'>candidate</span><code><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span></code></div><div class='aln-row marker'><code>                    </code></div><div class='aln-row'><span class='lbl'>PAM      </span><code>ACG</code> <span class='note-small'>(candidate strand; plus-strand footprint CGT)</span></div></div>
+</details>
+<details class="cand">
+<summary>#8 chr_demo1:16-36 +
+ score=100.0 type=exact</summary>
+<table class="meta">
+<tr><td>Guide (5'→3')</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Matched sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Plus-strand genomic sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>PAM (candidate strand)</td><td><code>ACG</code></td></tr>
+<tr><td>PAM plus-strand footprint</td><td><code>ACG</code></td></tr>
+<tr><td>Coordinates</td><td>16..36 (0-based half-open); PAM 36..39</td></tr>
+<tr><td>Strand</td><td>+</td></tr>
+<tr><td>Mismatch count</td><td>0</td></tr>
+<tr><td>Mismatch positions</td><td>-</td></tr>
+<tr><td>Ambiguous positions</td><td>-</td></tr>
+<tr><td>PAM compatible</td><td>yes</td></tr>
+<tr><td>Experimental score</td><td>100.0000</td></tr>
+<tr><td>Score breakdown</td><td><code>mismatches=0, mismatch_penalty=0.0, seed_mismatches=0, seed_penalty=0.0, pam_compatible=True, pam_penalty=0.0, ambiguous_positions=[], ambiguity_penalty=0.0, raw_score=100.0</code></td></tr>
+</table>
+<div class='alignment'><div class='aln-row'><span class='lbl'>guide   </span><code><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span></code></div><div class='aln-row'><span class='lbl'>candidate</span><code><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span></code></div><div class='aln-row marker'><code>                    </code></div><div class='aln-row'><span class='lbl'>PAM      </span><code>ACG</code> <span class='note-small'>(candidate strand; plus-strand footprint ACG)</span></div></div>
+</details>
+<details class="cand">
+<summary>#9 chr_demo1:16-36 -
+ score=100.0 type=exact</summary>
+<table class="meta">
+<tr><td>Guide (5'→3')</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Matched sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Plus-strand genomic sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>PAM (candidate strand)</td><td><code>ACG</code></td></tr>
+<tr><td>PAM plus-strand footprint</td><td><code>CGT</code></td></tr>
+<tr><td>Coordinates</td><td>16..36 (0-based half-open); PAM 13..16</td></tr>
+<tr><td>Strand</td><td>-</td></tr>
+<tr><td>Mismatch count</td><td>0</td></tr>
+<tr><td>Mismatch positions</td><td>-</td></tr>
+<tr><td>Ambiguous positions</td><td>-</td></tr>
+<tr><td>PAM compatible</td><td>yes</td></tr>
+<tr><td>Experimental score</td><td>100.0000</td></tr>
+<tr><td>Score breakdown</td><td><code>mismatches=0, mismatch_penalty=0.0, seed_mismatches=0, seed_penalty=0.0, pam_compatible=True, pam_penalty=0.0, ambiguous_positions=[], ambiguity_penalty=0.0, raw_score=100.0</code></td></tr>
+</table>
+<div class='alignment'><div class='aln-row'><span class='lbl'>guide   </span><code><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span></code></div><div class='aln-row'><span class='lbl'>candidate</span><code><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span></code></div><div class='aln-row marker'><code>                    </code></div><div class='aln-row'><span class='lbl'>PAM      </span><code>ACG</code> <span class='note-small'>(candidate strand; plus-strand footprint CGT)</span></div></div>
+</details>
+<details class="cand">
+<summary>#10 chr_demo1:20-40 +
+ score=100.0 type=exact</summary>
+<table class="meta">
+<tr><td>Guide (5'→3')</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Matched sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Plus-strand genomic sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>PAM (candidate strand)</td><td><code>ACG</code></td></tr>
+<tr><td>PAM plus-strand footprint</td><td><code>ACG</code></td></tr>
+<tr><td>Coordinates</td><td>20..40 (0-based half-open); PAM 40..43</td></tr>
+<tr><td>Strand</td><td>+</td></tr>
+<tr><td>Mismatch count</td><td>0</td></tr>
+<tr><td>Mismatch positions</td><td>-</td></tr>
+<tr><td>Ambiguous positions</td><td>-</td></tr>
+<tr><td>PAM compatible</td><td>yes</td></tr>
+<tr><td>Experimental score</td><td>100.0000</td></tr>
+<tr><td>Score breakdown</td><td><code>mismatches=0, mismatch_penalty=0.0, seed_mismatches=0, seed_penalty=0.0, pam_compatible=True, pam_penalty=0.0, ambiguous_positions=[], ambiguity_penalty=0.0, raw_score=100.0</code></td></tr>
+</table>
+<div class='alignment'><div class='aln-row'><span class='lbl'>guide   </span><code><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span></code></div><div class='aln-row'><span class='lbl'>candidate</span><code><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span></code></div><div class='aln-row marker'><code>                    </code></div><div class='aln-row'><span class='lbl'>PAM      </span><code>ACG</code> <span class='note-small'>(candidate strand; plus-strand footprint ACG)</span></div></div>
+</details>
+<details class="cand">
+<summary>#11 chr_demo1:20-40 -
+ score=100.0 type=exact</summary>
+<table class="meta">
+<tr><td>Guide (5'→3')</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Matched sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Plus-strand genomic sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>PAM (candidate strand)</td><td><code>ACG</code></td></tr>
+<tr><td>PAM plus-strand footprint</td><td><code>CGT</code></td></tr>
+<tr><td>Coordinates</td><td>20..40 (0-based half-open); PAM 17..20</td></tr>
+<tr><td>Strand</td><td>-</td></tr>
+<tr><td>Mismatch count</td><td>0</td></tr>
+<tr><td>Mismatch positions</td><td>-</td></tr>
+<tr><td>Ambiguous positions</td><td>-</td></tr>
+<tr><td>PAM compatible</td><td>yes</td></tr>
+<tr><td>Experimental score</td><td>100.0000</td></tr>
+<tr><td>Score breakdown</td><td><code>mismatches=0, mismatch_penalty=0.0, seed_mismatches=0, seed_penalty=0.0, pam_compatible=True, pam_penalty=0.0, ambiguous_positions=[], ambiguity_penalty=0.0, raw_score=100.0</code></td></tr>
+</table>
+<div class='alignment'><div class='aln-row'><span class='lbl'>guide   </span><code><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span></code></div><div class='aln-row'><span class='lbl'>candidate</span><code><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span></code></div><div class='aln-row marker'><code>                    </code></div><div class='aln-row'><span class='lbl'>PAM      </span><code>ACG</code> <span class='note-small'>(candidate strand; plus-strand footprint CGT)</span></div></div>
+</details>
+<details class="cand">
+<summary>#12 chr_demo1:24-44 +
+ score=100.0 type=exact</summary>
+<table class="meta">
+<tr><td>Guide (5'→3')</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Matched sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Plus-strand genomic sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>PAM (candidate strand)</td><td><code>ACG</code></td></tr>
+<tr><td>PAM plus-strand footprint</td><td><code>ACG</code></td></tr>
+<tr><td>Coordinates</td><td>24..44 (0-based half-open); PAM 44..47</td></tr>
+<tr><td>Strand</td><td>+</td></tr>
+<tr><td>Mismatch count</td><td>0</td></tr>
+<tr><td>Mismatch positions</td><td>-</td></tr>
+<tr><td>Ambiguous positions</td><td>-</td></tr>
+<tr><td>PAM compatible</td><td>yes</td></tr>
+<tr><td>Experimental score</td><td>100.0000</td></tr>
+<tr><td>Score breakdown</td><td><code>mismatches=0, mismatch_penalty=0.0, seed_mismatches=0, seed_penalty=0.0, pam_compatible=True, pam_penalty=0.0, ambiguous_positions=[], ambiguity_penalty=0.0, raw_score=100.0</code></td></tr>
+</table>
+<div class='alignment'><div class='aln-row'><span class='lbl'>guide   </span><code><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span></code></div><div class='aln-row'><span class='lbl'>candidate</span><code><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span></code></div><div class='aln-row marker'><code>                    </code></div><div class='aln-row'><span class='lbl'>PAM      </span><code>ACG</code> <span class='note-small'>(candidate strand; plus-strand footprint ACG)</span></div></div>
+</details>
+<details class="cand">
+<summary>#13 chr_demo1:24-44 -
+ score=100.0 type=exact</summary>
+<table class="meta">
+<tr><td>Guide (5'→3')</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Matched sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Plus-strand genomic sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>PAM (candidate strand)</td><td><code>ACG</code></td></tr>
+<tr><td>PAM plus-strand footprint</td><td><code>CGT</code></td></tr>
+<tr><td>Coordinates</td><td>24..44 (0-based half-open); PAM 21..24</td></tr>
+<tr><td>Strand</td><td>-</td></tr>
+<tr><td>Mismatch count</td><td>0</td></tr>
+<tr><td>Mismatch positions</td><td>-</td></tr>
+<tr><td>Ambiguous positions</td><td>-</td></tr>
+<tr><td>PAM compatible</td><td>yes</td></tr>
+<tr><td>Experimental score</td><td>100.0000</td></tr>
+<tr><td>Score breakdown</td><td><code>mismatches=0, mismatch_penalty=0.0, seed_mismatches=0, seed_penalty=0.0, pam_compatible=True, pam_penalty=0.0, ambiguous_positions=[], ambiguity_penalty=0.0, raw_score=100.0</code></td></tr>
+</table>
+<div class='alignment'><div class='aln-row'><span class='lbl'>guide   </span><code><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span></code></div><div class='aln-row'><span class='lbl'>candidate</span><code><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span></code></div><div class='aln-row marker'><code>                    </code></div><div class='aln-row'><span class='lbl'>PAM      </span><code>ACG</code> <span class='note-small'>(candidate strand; plus-strand footprint CGT)</span></div></div>
+</details>
+<details class="cand">
+<summary>#14 chr_demo1:28-48 +
+ score=100.0 type=exact</summary>
+<table class="meta">
+<tr><td>Guide (5'→3')</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Matched sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Plus-strand genomic sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>PAM (candidate strand)</td><td><code>ACG</code></td></tr>
+<tr><td>PAM plus-strand footprint</td><td><code>ACG</code></td></tr>
+<tr><td>Coordinates</td><td>28..48 (0-based half-open); PAM 48..51</td></tr>
+<tr><td>Strand</td><td>+</td></tr>
+<tr><td>Mismatch count</td><td>0</td></tr>
+<tr><td>Mismatch positions</td><td>-</td></tr>
+<tr><td>Ambiguous positions</td><td>-</td></tr>
+<tr><td>PAM compatible</td><td>yes</td></tr>
+<tr><td>Experimental score</td><td>100.0000</td></tr>
+<tr><td>Score breakdown</td><td><code>mismatches=0, mismatch_penalty=0.0, seed_mismatches=0, seed_penalty=0.0, pam_compatible=True, pam_penalty=0.0, ambiguous_positions=[], ambiguity_penalty=0.0, raw_score=100.0</code></td></tr>
+</table>
+<div class='alignment'><div class='aln-row'><span class='lbl'>guide   </span><code><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span></code></div><div class='aln-row'><span class='lbl'>candidate</span><code><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span></code></div><div class='aln-row marker'><code>                    </code></div><div class='aln-row'><span class='lbl'>PAM      </span><code>ACG</code> <span class='note-small'>(candidate strand; plus-strand footprint ACG)</span></div></div>
+</details>
+<details class="cand">
+<summary>#15 chr_demo1:28-48 -
+ score=100.0 type=exact</summary>
+<table class="meta">
+<tr><td>Guide (5'→3')</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Matched sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Plus-strand genomic sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>PAM (candidate strand)</td><td><code>ACG</code></td></tr>
+<tr><td>PAM plus-strand footprint</td><td><code>CGT</code></td></tr>
+<tr><td>Coordinates</td><td>28..48 (0-based half-open); PAM 25..28</td></tr>
+<tr><td>Strand</td><td>-</td></tr>
+<tr><td>Mismatch count</td><td>0</td></tr>
+<tr><td>Mismatch positions</td><td>-</td></tr>
+<tr><td>Ambiguous positions</td><td>-</td></tr>
+<tr><td>PAM compatible</td><td>yes</td></tr>
+<tr><td>Experimental score</td><td>100.0000</td></tr>
+<tr><td>Score breakdown</td><td><code>mismatches=0, mismatch_penalty=0.0, seed_mismatches=0, seed_penalty=0.0, pam_compatible=True, pam_penalty=0.0, ambiguous_positions=[], ambiguity_penalty=0.0, raw_score=100.0</code></td></tr>
+</table>
+<div class='alignment'><div class='aln-row'><span class='lbl'>guide   </span><code><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span></code></div><div class='aln-row'><span class='lbl'>candidate</span><code><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span></code></div><div class='aln-row marker'><code>                    </code></div><div class='aln-row'><span class='lbl'>PAM      </span><code>ACG</code> <span class='note-small'>(candidate strand; plus-strand footprint CGT)</span></div></div>
+</details>
+<details class="cand">
+<summary>#16 chr_demo1:32-52 +
+ score=100.0 type=exact</summary>
+<table class="meta">
+<tr><td>Guide (5'→3')</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Matched sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Plus-strand genomic sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>PAM (candidate strand)</td><td><code>ACG</code></td></tr>
+<tr><td>PAM plus-strand footprint</td><td><code>ACG</code></td></tr>
+<tr><td>Coordinates</td><td>32..52 (0-based half-open); PAM 52..55</td></tr>
+<tr><td>Strand</td><td>+</td></tr>
+<tr><td>Mismatch count</td><td>0</td></tr>
+<tr><td>Mismatch positions</td><td>-</td></tr>
+<tr><td>Ambiguous positions</td><td>-</td></tr>
+<tr><td>PAM compatible</td><td>yes</td></tr>
+<tr><td>Experimental score</td><td>100.0000</td></tr>
+<tr><td>Score breakdown</td><td><code>mismatches=0, mismatch_penalty=0.0, seed_mismatches=0, seed_penalty=0.0, pam_compatible=True, pam_penalty=0.0, ambiguous_positions=[], ambiguity_penalty=0.0, raw_score=100.0</code></td></tr>
+</table>
+<div class='alignment'><div class='aln-row'><span class='lbl'>guide   </span><code><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span></code></div><div class='aln-row'><span class='lbl'>candidate</span><code><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span></code></div><div class='aln-row marker'><code>                    </code></div><div class='aln-row'><span class='lbl'>PAM      </span><code>ACG</code> <span class='note-small'>(candidate strand; plus-strand footprint ACG)</span></div></div>
+</details>
+<details class="cand">
+<summary>#17 chr_demo1:32-52 -
+ score=100.0 type=exact</summary>
+<table class="meta">
+<tr><td>Guide (5'→3')</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Matched sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Plus-strand genomic sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>PAM (candidate strand)</td><td><code>ACG</code></td></tr>
+<tr><td>PAM plus-strand footprint</td><td><code>CGT</code></td></tr>
+<tr><td>Coordinates</td><td>32..52 (0-based half-open); PAM 29..32</td></tr>
+<tr><td>Strand</td><td>-</td></tr>
+<tr><td>Mismatch count</td><td>0</td></tr>
+<tr><td>Mismatch positions</td><td>-</td></tr>
+<tr><td>Ambiguous positions</td><td>-</td></tr>
+<tr><td>PAM compatible</td><td>yes</td></tr>
+<tr><td>Experimental score</td><td>100.0000</td></tr>
+<tr><td>Score breakdown</td><td><code>mismatches=0, mismatch_penalty=0.0, seed_mismatches=0, seed_penalty=0.0, pam_compatible=True, pam_penalty=0.0, ambiguous_positions=[], ambiguity_penalty=0.0, raw_score=100.0</code></td></tr>
+</table>
+<div class='alignment'><div class='aln-row'><span class='lbl'>guide   </span><code><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span></code></div><div class='aln-row'><span class='lbl'>candidate</span><code><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span></code></div><div class='aln-row marker'><code>                    </code></div><div class='aln-row'><span class='lbl'>PAM      </span><code>ACG</code> <span class='note-small'>(candidate strand; plus-strand footprint CGT)</span></div></div>
+</details>
+<details class="cand">
+<summary>#18 chr_demo1:36-56 +
+ score=100.0 type=exact</summary>
+<table class="meta">
+<tr><td>Guide (5'→3')</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Matched sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Plus-strand genomic sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>PAM (candidate strand)</td><td><code>ACG</code></td></tr>
+<tr><td>PAM plus-strand footprint</td><td><code>ACG</code></td></tr>
+<tr><td>Coordinates</td><td>36..56 (0-based half-open); PAM 56..59</td></tr>
+<tr><td>Strand</td><td>+</td></tr>
+<tr><td>Mismatch count</td><td>0</td></tr>
+<tr><td>Mismatch positions</td><td>-</td></tr>
+<tr><td>Ambiguous positions</td><td>-</td></tr>
+<tr><td>PAM compatible</td><td>yes</td></tr>
+<tr><td>Experimental score</td><td>100.0000</td></tr>
+<tr><td>Score breakdown</td><td><code>mismatches=0, mismatch_penalty=0.0, seed_mismatches=0, seed_penalty=0.0, pam_compatible=True, pam_penalty=0.0, ambiguous_positions=[], ambiguity_penalty=0.0, raw_score=100.0</code></td></tr>
+</table>
+<div class='alignment'><div class='aln-row'><span class='lbl'>guide   </span><code><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span></code></div><div class='aln-row'><span class='lbl'>candidate</span><code><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span></code></div><div class='aln-row marker'><code>                    </code></div><div class='aln-row'><span class='lbl'>PAM      </span><code>ACG</code> <span class='note-small'>(candidate strand; plus-strand footprint ACG)</span></div></div>
+</details>
+<details class="cand">
+<summary>#19 chr_demo1:36-56 -
+ score=100.0 type=exact</summary>
+<table class="meta">
+<tr><td>Guide (5'→3')</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Matched sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Plus-strand genomic sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>PAM (candidate strand)</td><td><code>ACG</code></td></tr>
+<tr><td>PAM plus-strand footprint</td><td><code>CGT</code></td></tr>
+<tr><td>Coordinates</td><td>36..56 (0-based half-open); PAM 33..36</td></tr>
+<tr><td>Strand</td><td>-</td></tr>
+<tr><td>Mismatch count</td><td>0</td></tr>
+<tr><td>Mismatch positions</td><td>-</td></tr>
+<tr><td>Ambiguous positions</td><td>-</td></tr>
+<tr><td>PAM compatible</td><td>yes</td></tr>
+<tr><td>Experimental score</td><td>100.0000</td></tr>
+<tr><td>Score breakdown</td><td><code>mismatches=0, mismatch_penalty=0.0, seed_mismatches=0, seed_penalty=0.0, pam_compatible=True, pam_penalty=0.0, ambiguous_positions=[], ambiguity_penalty=0.0, raw_score=100.0</code></td></tr>
+</table>
+<div class='alignment'><div class='aln-row'><span class='lbl'>guide   </span><code><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span></code></div><div class='aln-row'><span class='lbl'>candidate</span><code><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span></code></div><div class='aln-row marker'><code>                    </code></div><div class='aln-row'><span class='lbl'>PAM      </span><code>ACG</code> <span class='note-small'>(candidate strand; plus-strand footprint CGT)</span></div></div>
+</details>
+<details class="cand">
+<summary>#20 chr_demo1:40-60 +
+ score=100.0 type=exact</summary>
+<table class="meta">
+<tr><td>Guide (5'→3')</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Matched sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Plus-strand genomic sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>PAM (candidate strand)</td><td><code>ACG</code></td></tr>
+<tr><td>PAM plus-strand footprint</td><td><code>ACG</code></td></tr>
+<tr><td>Coordinates</td><td>40..60 (0-based half-open); PAM 60..63</td></tr>
+<tr><td>Strand</td><td>+</td></tr>
+<tr><td>Mismatch count</td><td>0</td></tr>
+<tr><td>Mismatch positions</td><td>-</td></tr>
+<tr><td>Ambiguous positions</td><td>-</td></tr>
+<tr><td>PAM compatible</td><td>yes</td></tr>
+<tr><td>Experimental score</td><td>100.0000</td></tr>
+<tr><td>Score breakdown</td><td><code>mismatches=0, mismatch_penalty=0.0, seed_mismatches=0, seed_penalty=0.0, pam_compatible=True, pam_penalty=0.0, ambiguous_positions=[], ambiguity_penalty=0.0, raw_score=100.0</code></td></tr>
+</table>
+<div class='alignment'><div class='aln-row'><span class='lbl'>guide   </span><code><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span></code></div><div class='aln-row'><span class='lbl'>candidate</span><code><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span></code></div><div class='aln-row marker'><code>                    </code></div><div class='aln-row'><span class='lbl'>PAM      </span><code>ACG</code> <span class='note-small'>(candidate strand; plus-strand footprint ACG)</span></div></div>
+</details>
+<details class="cand">
+<summary>#21 chr_demo1:40-60 -
+ score=100.0 type=exact</summary>
+<table class="meta">
+<tr><td>Guide (5'→3')</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Matched sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Plus-strand genomic sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>PAM (candidate strand)</td><td><code>ACG</code></td></tr>
+<tr><td>PAM plus-strand footprint</td><td><code>CGT</code></td></tr>
+<tr><td>Coordinates</td><td>40..60 (0-based half-open); PAM 37..40</td></tr>
+<tr><td>Strand</td><td>-</td></tr>
+<tr><td>Mismatch count</td><td>0</td></tr>
+<tr><td>Mismatch positions</td><td>-</td></tr>
+<tr><td>Ambiguous positions</td><td>-</td></tr>
+<tr><td>PAM compatible</td><td>yes</td></tr>
+<tr><td>Experimental score</td><td>100.0000</td></tr>
+<tr><td>Score breakdown</td><td><code>mismatches=0, mismatch_penalty=0.0, seed_mismatches=0, seed_penalty=0.0, pam_compatible=True, pam_penalty=0.0, ambiguous_positions=[], ambiguity_penalty=0.0, raw_score=100.0</code></td></tr>
+</table>
+<div class='alignment'><div class='aln-row'><span class='lbl'>guide   </span><code><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span></code></div><div class='aln-row'><span class='lbl'>candidate</span><code><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span></code></div><div class='aln-row marker'><code>                    </code></div><div class='aln-row'><span class='lbl'>PAM      </span><code>ACG</code> <span class='note-small'>(candidate strand; plus-strand footprint CGT)</span></div></div>
+</details>
+<details class="cand">
+<summary>#22 chr_demo1:44-64 +
+ score=100.0 type=exact</summary>
+<table class="meta">
+<tr><td>Guide (5'→3')</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Matched sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Plus-strand genomic sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>PAM (candidate strand)</td><td><code>ACG</code></td></tr>
+<tr><td>PAM plus-strand footprint</td><td><code>ACG</code></td></tr>
+<tr><td>Coordinates</td><td>44..64 (0-based half-open); PAM 64..67</td></tr>
+<tr><td>Strand</td><td>+</td></tr>
+<tr><td>Mismatch count</td><td>0</td></tr>
+<tr><td>Mismatch positions</td><td>-</td></tr>
+<tr><td>Ambiguous positions</td><td>-</td></tr>
+<tr><td>PAM compatible</td><td>yes</td></tr>
+<tr><td>Experimental score</td><td>100.0000</td></tr>
+<tr><td>Score breakdown</td><td><code>mismatches=0, mismatch_penalty=0.0, seed_mismatches=0, seed_penalty=0.0, pam_compatible=True, pam_penalty=0.0, ambiguous_positions=[], ambiguity_penalty=0.0, raw_score=100.0</code></td></tr>
+</table>
+<div class='alignment'><div class='aln-row'><span class='lbl'>guide   </span><code><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span></code></div><div class='aln-row'><span class='lbl'>candidate</span><code><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span></code></div><div class='aln-row marker'><code>                    </code></div><div class='aln-row'><span class='lbl'>PAM      </span><code>ACG</code> <span class='note-small'>(candidate strand; plus-strand footprint ACG)</span></div></div>
+</details>
+<details class="cand">
+<summary>#23 chr_demo1:44-64 -
+ score=100.0 type=exact</summary>
+<table class="meta">
+<tr><td>Guide (5'→3')</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Matched sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Plus-strand genomic sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>PAM (candidate strand)</td><td><code>ACG</code></td></tr>
+<tr><td>PAM plus-strand footprint</td><td><code>CGT</code></td></tr>
+<tr><td>Coordinates</td><td>44..64 (0-based half-open); PAM 41..44</td></tr>
+<tr><td>Strand</td><td>-</td></tr>
+<tr><td>Mismatch count</td><td>0</td></tr>
+<tr><td>Mismatch positions</td><td>-</td></tr>
+<tr><td>Ambiguous positions</td><td>-</td></tr>
+<tr><td>PAM compatible</td><td>yes</td></tr>
+<tr><td>Experimental score</td><td>100.0000</td></tr>
+<tr><td>Score breakdown</td><td><code>mismatches=0, mismatch_penalty=0.0, seed_mismatches=0, seed_penalty=0.0, pam_compatible=True, pam_penalty=0.0, ambiguous_positions=[], ambiguity_penalty=0.0, raw_score=100.0</code></td></tr>
+</table>
+<div class='alignment'><div class='aln-row'><span class='lbl'>guide   </span><code><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span></code></div><div class='aln-row'><span class='lbl'>candidate</span><code><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span></code></div><div class='aln-row marker'><code>                    </code></div><div class='aln-row'><span class='lbl'>PAM      </span><code>ACG</code> <span class='note-small'>(candidate strand; plus-strand footprint CGT)</span></div></div>
+</details>
+<details class="cand">
+<summary>#24 chr_demo1:48-68 +
+ score=100.0 type=exact</summary>
+<table class="meta">
+<tr><td>Guide (5'→3')</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Matched sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Plus-strand genomic sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>PAM (candidate strand)</td><td><code>ACG</code></td></tr>
+<tr><td>PAM plus-strand footprint</td><td><code>ACG</code></td></tr>
+<tr><td>Coordinates</td><td>48..68 (0-based half-open); PAM 68..71</td></tr>
+<tr><td>Strand</td><td>+</td></tr>
+<tr><td>Mismatch count</td><td>0</td></tr>
+<tr><td>Mismatch positions</td><td>-</td></tr>
+<tr><td>Ambiguous positions</td><td>-</td></tr>
+<tr><td>PAM compatible</td><td>yes</td></tr>
+<tr><td>Experimental score</td><td>100.0000</td></tr>
+<tr><td>Score breakdown</td><td><code>mismatches=0, mismatch_penalty=0.0, seed_mismatches=0, seed_penalty=0.0, pam_compatible=True, pam_penalty=0.0, ambiguous_positions=[], ambiguity_penalty=0.0, raw_score=100.0</code></td></tr>
+</table>
+<div class='alignment'><div class='aln-row'><span class='lbl'>guide   </span><code><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span></code></div><div class='aln-row'><span class='lbl'>candidate</span><code><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span></code></div><div class='aln-row marker'><code>                    </code></div><div class='aln-row'><span class='lbl'>PAM      </span><code>ACG</code> <span class='note-small'>(candidate strand; plus-strand footprint ACG)</span></div></div>
+</details>
+<details class="cand">
+<summary>#25 chr_demo1:48-68 -
+ score=100.0 type=exact</summary>
+<table class="meta">
+<tr><td>Guide (5'→3')</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Matched sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Plus-strand genomic sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>PAM (candidate strand)</td><td><code>ACG</code></td></tr>
+<tr><td>PAM plus-strand footprint</td><td><code>CGT</code></td></tr>
+<tr><td>Coordinates</td><td>48..68 (0-based half-open); PAM 45..48</td></tr>
+<tr><td>Strand</td><td>-</td></tr>
+<tr><td>Mismatch count</td><td>0</td></tr>
+<tr><td>Mismatch positions</td><td>-</td></tr>
+<tr><td>Ambiguous positions</td><td>-</td></tr>
+<tr><td>PAM compatible</td><td>yes</td></tr>
+<tr><td>Experimental score</td><td>100.0000</td></tr>
+<tr><td>Score breakdown</td><td><code>mismatches=0, mismatch_penalty=0.0, seed_mismatches=0, seed_penalty=0.0, pam_compatible=True, pam_penalty=0.0, ambiguous_positions=[], ambiguity_penalty=0.0, raw_score=100.0</code></td></tr>
+</table>
+<div class='alignment'><div class='aln-row'><span class='lbl'>guide   </span><code><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span></code></div><div class='aln-row'><span class='lbl'>candidate</span><code><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span></code></div><div class='aln-row marker'><code>                    </code></div><div class='aln-row'><span class='lbl'>PAM      </span><code>ACG</code> <span class='note-small'>(candidate strand; plus-strand footprint CGT)</span></div></div>
+</details>
+<details class="cand">
+<summary>#26 chr_demo1:52-72 +
+ score=100.0 type=exact</summary>
+<table class="meta">
+<tr><td>Guide (5'→3')</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Matched sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Plus-strand genomic sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>PAM (candidate strand)</td><td><code>ACG</code></td></tr>
+<tr><td>PAM plus-strand footprint</td><td><code>ACG</code></td></tr>
+<tr><td>Coordinates</td><td>52..72 (0-based half-open); PAM 72..75</td></tr>
+<tr><td>Strand</td><td>+</td></tr>
+<tr><td>Mismatch count</td><td>0</td></tr>
+<tr><td>Mismatch positions</td><td>-</td></tr>
+<tr><td>Ambiguous positions</td><td>-</td></tr>
+<tr><td>PAM compatible</td><td>yes</td></tr>
+<tr><td>Experimental score</td><td>100.0000</td></tr>
+<tr><td>Score breakdown</td><td><code>mismatches=0, mismatch_penalty=0.0, seed_mismatches=0, seed_penalty=0.0, pam_compatible=True, pam_penalty=0.0, ambiguous_positions=[], ambiguity_penalty=0.0, raw_score=100.0</code></td></tr>
+</table>
+<div class='alignment'><div class='aln-row'><span class='lbl'>guide   </span><code><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span></code></div><div class='aln-row'><span class='lbl'>candidate</span><code><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span></code></div><div class='aln-row marker'><code>                    </code></div><div class='aln-row'><span class='lbl'>PAM      </span><code>ACG</code> <span class='note-small'>(candidate strand; plus-strand footprint ACG)</span></div></div>
+</details>
+<details class="cand">
+<summary>#27 chr_demo1:52-72 -
+ score=100.0 type=exact</summary>
+<table class="meta">
+<tr><td>Guide (5'→3')</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Matched sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Plus-strand genomic sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>PAM (candidate strand)</td><td><code>ACG</code></td></tr>
+<tr><td>PAM plus-strand footprint</td><td><code>CGT</code></td></tr>
+<tr><td>Coordinates</td><td>52..72 (0-based half-open); PAM 49..52</td></tr>
+<tr><td>Strand</td><td>-</td></tr>
+<tr><td>Mismatch count</td><td>0</td></tr>
+<tr><td>Mismatch positions</td><td>-</td></tr>
+<tr><td>Ambiguous positions</td><td>-</td></tr>
+<tr><td>PAM compatible</td><td>yes</td></tr>
+<tr><td>Experimental score</td><td>100.0000</td></tr>
+<tr><td>Score breakdown</td><td><code>mismatches=0, mismatch_penalty=0.0, seed_mismatches=0, seed_penalty=0.0, pam_compatible=True, pam_penalty=0.0, ambiguous_positions=[], ambiguity_penalty=0.0, raw_score=100.0</code></td></tr>
+</table>
+<div class='alignment'><div class='aln-row'><span class='lbl'>guide   </span><code><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span></code></div><div class='aln-row'><span class='lbl'>candidate</span><code><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span></code></div><div class='aln-row marker'><code>                    </code></div><div class='aln-row'><span class='lbl'>PAM      </span><code>ACG</code> <span class='note-small'>(candidate strand; plus-strand footprint CGT)</span></div></div>
+</details>
+<details class="cand">
+<summary>#28 chr_demo1:56-76 +
+ score=100.0 type=exact</summary>
+<table class="meta">
+<tr><td>Guide (5'→3')</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Matched sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Plus-strand genomic sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>PAM (candidate strand)</td><td><code>ACG</code></td></tr>
+<tr><td>PAM plus-strand footprint</td><td><code>ACG</code></td></tr>
+<tr><td>Coordinates</td><td>56..76 (0-based half-open); PAM 76..79</td></tr>
+<tr><td>Strand</td><td>+</td></tr>
+<tr><td>Mismatch count</td><td>0</td></tr>
+<tr><td>Mismatch positions</td><td>-</td></tr>
+<tr><td>Ambiguous positions</td><td>-</td></tr>
+<tr><td>PAM compatible</td><td>yes</td></tr>
+<tr><td>Experimental score</td><td>100.0000</td></tr>
+<tr><td>Score breakdown</td><td><code>mismatches=0, mismatch_penalty=0.0, seed_mismatches=0, seed_penalty=0.0, pam_compatible=True, pam_penalty=0.0, ambiguous_positions=[], ambiguity_penalty=0.0, raw_score=100.0</code></td></tr>
+</table>
+<div class='alignment'><div class='aln-row'><span class='lbl'>guide   </span><code><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span></code></div><div class='aln-row'><span class='lbl'>candidate</span><code><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span></code></div><div class='aln-row marker'><code>                    </code></div><div class='aln-row'><span class='lbl'>PAM      </span><code>ACG</code> <span class='note-small'>(candidate strand; plus-strand footprint ACG)</span></div></div>
+</details>
+<details class="cand">
+<summary>#29 chr_demo1:56-76 -
+ score=100.0 type=exact</summary>
+<table class="meta">
+<tr><td>Guide (5'→3')</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Matched sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Plus-strand genomic sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>PAM (candidate strand)</td><td><code>ACG</code></td></tr>
+<tr><td>PAM plus-strand footprint</td><td><code>CGT</code></td></tr>
+<tr><td>Coordinates</td><td>56..76 (0-based half-open); PAM 53..56</td></tr>
+<tr><td>Strand</td><td>-</td></tr>
+<tr><td>Mismatch count</td><td>0</td></tr>
+<tr><td>Mismatch positions</td><td>-</td></tr>
+<tr><td>Ambiguous positions</td><td>-</td></tr>
+<tr><td>PAM compatible</td><td>yes</td></tr>
+<tr><td>Experimental score</td><td>100.0000</td></tr>
+<tr><td>Score breakdown</td><td><code>mismatches=0, mismatch_penalty=0.0, seed_mismatches=0, seed_penalty=0.0, pam_compatible=True, pam_penalty=0.0, ambiguous_positions=[], ambiguity_penalty=0.0, raw_score=100.0</code></td></tr>
+</table>
+<div class='alignment'><div class='aln-row'><span class='lbl'>guide   </span><code><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span></code></div><div class='aln-row'><span class='lbl'>candidate</span><code><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span></code></div><div class='aln-row marker'><code>                    </code></div><div class='aln-row'><span class='lbl'>PAM      </span><code>ACG</code> <span class='note-small'>(candidate strand; plus-strand footprint CGT)</span></div></div>
+</details>
+<details class="cand">
+<summary>#30 chr_demo1:60-80 +
+ score=100.0 type=exact</summary>
+<table class="meta">
+<tr><td>Guide (5'→3')</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Matched sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Plus-strand genomic sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>PAM (candidate strand)</td><td><code>ACG</code></td></tr>
+<tr><td>PAM plus-strand footprint</td><td><code>ACG</code></td></tr>
+<tr><td>Coordinates</td><td>60..80 (0-based half-open); PAM 80..83</td></tr>
+<tr><td>Strand</td><td>+</td></tr>
+<tr><td>Mismatch count</td><td>0</td></tr>
+<tr><td>Mismatch positions</td><td>-</td></tr>
+<tr><td>Ambiguous positions</td><td>-</td></tr>
+<tr><td>PAM compatible</td><td>yes</td></tr>
+<tr><td>Experimental score</td><td>100.0000</td></tr>
+<tr><td>Score breakdown</td><td><code>mismatches=0, mismatch_penalty=0.0, seed_mismatches=0, seed_penalty=0.0, pam_compatible=True, pam_penalty=0.0, ambiguous_positions=[], ambiguity_penalty=0.0, raw_score=100.0</code></td></tr>
+</table>
+<div class='alignment'><div class='aln-row'><span class='lbl'>guide   </span><code><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span></code></div><div class='aln-row'><span class='lbl'>candidate</span><code><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span></code></div><div class='aln-row marker'><code>                    </code></div><div class='aln-row'><span class='lbl'>PAM      </span><code>ACG</code> <span class='note-small'>(candidate strand; plus-strand footprint ACG)</span></div></div>
+</details>
+<details class="cand">
+<summary>#31 chr_demo1:60-80 -
+ score=100.0 type=exact</summary>
+<table class="meta">
+<tr><td>Guide (5'→3')</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Matched sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Plus-strand genomic sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>PAM (candidate strand)</td><td><code>ACG</code></td></tr>
+<tr><td>PAM plus-strand footprint</td><td><code>CGT</code></td></tr>
+<tr><td>Coordinates</td><td>60..80 (0-based half-open); PAM 57..60</td></tr>
+<tr><td>Strand</td><td>-</td></tr>
+<tr><td>Mismatch count</td><td>0</td></tr>
+<tr><td>Mismatch positions</td><td>-</td></tr>
+<tr><td>Ambiguous positions</td><td>-</td></tr>
+<tr><td>PAM compatible</td><td>yes</td></tr>
+<tr><td>Experimental score</td><td>100.0000</td></tr>
+<tr><td>Score breakdown</td><td><code>mismatches=0, mismatch_penalty=0.0, seed_mismatches=0, seed_penalty=0.0, pam_compatible=True, pam_penalty=0.0, ambiguous_positions=[], ambiguity_penalty=0.0, raw_score=100.0</code></td></tr>
+</table>
+<div class='alignment'><div class='aln-row'><span class='lbl'>guide   </span><code><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span></code></div><div class='aln-row'><span class='lbl'>candidate</span><code><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span></code></div><div class='aln-row marker'><code>                    </code></div><div class='aln-row'><span class='lbl'>PAM      </span><code>ACG</code> <span class='note-small'>(candidate strand; plus-strand footprint CGT)</span></div></div>
+</details>
+<details class="cand">
+<summary>#32 chr_demo1:64-84 +
+ score=100.0 type=exact</summary>
+<table class="meta">
+<tr><td>Guide (5'→3')</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Matched sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Plus-strand genomic sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>PAM (candidate strand)</td><td><code>ACG</code></td></tr>
+<tr><td>PAM plus-strand footprint</td><td><code>ACG</code></td></tr>
+<tr><td>Coordinates</td><td>64..84 (0-based half-open); PAM 84..87</td></tr>
+<tr><td>Strand</td><td>+</td></tr>
+<tr><td>Mismatch count</td><td>0</td></tr>
+<tr><td>Mismatch positions</td><td>-</td></tr>
+<tr><td>Ambiguous positions</td><td>-</td></tr>
+<tr><td>PAM compatible</td><td>yes</td></tr>
+<tr><td>Experimental score</td><td>100.0000</td></tr>
+<tr><td>Score breakdown</td><td><code>mismatches=0, mismatch_penalty=0.0, seed_mismatches=0, seed_penalty=0.0, pam_compatible=True, pam_penalty=0.0, ambiguous_positions=[], ambiguity_penalty=0.0, raw_score=100.0</code></td></tr>
+</table>
+<div class='alignment'><div class='aln-row'><span class='lbl'>guide   </span><code><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span></code></div><div class='aln-row'><span class='lbl'>candidate</span><code><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span></code></div><div class='aln-row marker'><code>                    </code></div><div class='aln-row'><span class='lbl'>PAM      </span><code>ACG</code> <span class='note-small'>(candidate strand; plus-strand footprint ACG)</span></div></div>
+</details>
+<details class="cand">
+<summary>#33 chr_demo1:64-84 -
+ score=100.0 type=exact</summary>
+<table class="meta">
+<tr><td>Guide (5'→3')</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Matched sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Plus-strand genomic sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>PAM (candidate strand)</td><td><code>ACG</code></td></tr>
+<tr><td>PAM plus-strand footprint</td><td><code>CGT</code></td></tr>
+<tr><td>Coordinates</td><td>64..84 (0-based half-open); PAM 61..64</td></tr>
+<tr><td>Strand</td><td>-</td></tr>
+<tr><td>Mismatch count</td><td>0</td></tr>
+<tr><td>Mismatch positions</td><td>-</td></tr>
+<tr><td>Ambiguous positions</td><td>-</td></tr>
+<tr><td>PAM compatible</td><td>yes</td></tr>
+<tr><td>Experimental score</td><td>100.0000</td></tr>
+<tr><td>Score breakdown</td><td><code>mismatches=0, mismatch_penalty=0.0, seed_mismatches=0, seed_penalty=0.0, pam_compatible=True, pam_penalty=0.0, ambiguous_positions=[], ambiguity_penalty=0.0, raw_score=100.0</code></td></tr>
+</table>
+<div class='alignment'><div class='aln-row'><span class='lbl'>guide   </span><code><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span></code></div><div class='aln-row'><span class='lbl'>candidate</span><code><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span></code></div><div class='aln-row marker'><code>                    </code></div><div class='aln-row'><span class='lbl'>PAM      </span><code>ACG</code> <span class='note-small'>(candidate strand; plus-strand footprint CGT)</span></div></div>
+</details>
+<details class="cand">
+<summary>#34 chr_demo1:68-88 +
+ score=100.0 type=exact</summary>
+<table class="meta">
+<tr><td>Guide (5'→3')</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Matched sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Plus-strand genomic sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>PAM (candidate strand)</td><td><code>ACG</code></td></tr>
+<tr><td>PAM plus-strand footprint</td><td><code>ACG</code></td></tr>
+<tr><td>Coordinates</td><td>68..88 (0-based half-open); PAM 88..91</td></tr>
+<tr><td>Strand</td><td>+</td></tr>
+<tr><td>Mismatch count</td><td>0</td></tr>
+<tr><td>Mismatch positions</td><td>-</td></tr>
+<tr><td>Ambiguous positions</td><td>-</td></tr>
+<tr><td>PAM compatible</td><td>yes</td></tr>
+<tr><td>Experimental score</td><td>100.0000</td></tr>
+<tr><td>Score breakdown</td><td><code>mismatches=0, mismatch_penalty=0.0, seed_mismatches=0, seed_penalty=0.0, pam_compatible=True, pam_penalty=0.0, ambiguous_positions=[], ambiguity_penalty=0.0, raw_score=100.0</code></td></tr>
+</table>
+<div class='alignment'><div class='aln-row'><span class='lbl'>guide   </span><code><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span></code></div><div class='aln-row'><span class='lbl'>candidate</span><code><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span></code></div><div class='aln-row marker'><code>                    </code></div><div class='aln-row'><span class='lbl'>PAM      </span><code>ACG</code> <span class='note-small'>(candidate strand; plus-strand footprint ACG)</span></div></div>
+</details>
+<details class="cand">
+<summary>#35 chr_demo1:68-88 -
+ score=100.0 type=exact</summary>
+<table class="meta">
+<tr><td>Guide (5'→3')</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Matched sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Plus-strand genomic sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>PAM (candidate strand)</td><td><code>ACG</code></td></tr>
+<tr><td>PAM plus-strand footprint</td><td><code>CGT</code></td></tr>
+<tr><td>Coordinates</td><td>68..88 (0-based half-open); PAM 65..68</td></tr>
+<tr><td>Strand</td><td>-</td></tr>
+<tr><td>Mismatch count</td><td>0</td></tr>
+<tr><td>Mismatch positions</td><td>-</td></tr>
+<tr><td>Ambiguous positions</td><td>-</td></tr>
+<tr><td>PAM compatible</td><td>yes</td></tr>
+<tr><td>Experimental score</td><td>100.0000</td></tr>
+<tr><td>Score breakdown</td><td><code>mismatches=0, mismatch_penalty=0.0, seed_mismatches=0, seed_penalty=0.0, pam_compatible=True, pam_penalty=0.0, ambiguous_positions=[], ambiguity_penalty=0.0, raw_score=100.0</code></td></tr>
+</table>
+<div class='alignment'><div class='aln-row'><span class='lbl'>guide   </span><code><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span></code></div><div class='aln-row'><span class='lbl'>candidate</span><code><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span></code></div><div class='aln-row marker'><code>                    </code></div><div class='aln-row'><span class='lbl'>PAM      </span><code>ACG</code> <span class='note-small'>(candidate strand; plus-strand footprint CGT)</span></div></div>
+</details>
+<details class="cand">
+<summary>#36 chr_demo1:72-92 +
+ score=100.0 type=exact</summary>
+<table class="meta">
+<tr><td>Guide (5'→3')</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Matched sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Plus-strand genomic sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>PAM (candidate strand)</td><td><code>ACG</code></td></tr>
+<tr><td>PAM plus-strand footprint</td><td><code>ACG</code></td></tr>
+<tr><td>Coordinates</td><td>72..92 (0-based half-open); PAM 92..95</td></tr>
+<tr><td>Strand</td><td>+</td></tr>
+<tr><td>Mismatch count</td><td>0</td></tr>
+<tr><td>Mismatch positions</td><td>-</td></tr>
+<tr><td>Ambiguous positions</td><td>-</td></tr>
+<tr><td>PAM compatible</td><td>yes</td></tr>
+<tr><td>Experimental score</td><td>100.0000</td></tr>
+<tr><td>Score breakdown</td><td><code>mismatches=0, mismatch_penalty=0.0, seed_mismatches=0, seed_penalty=0.0, pam_compatible=True, pam_penalty=0.0, ambiguous_positions=[], ambiguity_penalty=0.0, raw_score=100.0</code></td></tr>
+</table>
+<div class='alignment'><div class='aln-row'><span class='lbl'>guide   </span><code><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span></code></div><div class='aln-row'><span class='lbl'>candidate</span><code><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span></code></div><div class='aln-row marker'><code>                    </code></div><div class='aln-row'><span class='lbl'>PAM      </span><code>ACG</code> <span class='note-small'>(candidate strand; plus-strand footprint ACG)</span></div></div>
+</details>
+<details class="cand">
+<summary>#37 chr_demo1:72-92 -
+ score=100.0 type=exact</summary>
+<table class="meta">
+<tr><td>Guide (5'→3')</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Matched sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Plus-strand genomic sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>PAM (candidate strand)</td><td><code>ACG</code></td></tr>
+<tr><td>PAM plus-strand footprint</td><td><code>CGT</code></td></tr>
+<tr><td>Coordinates</td><td>72..92 (0-based half-open); PAM 69..72</td></tr>
+<tr><td>Strand</td><td>-</td></tr>
+<tr><td>Mismatch count</td><td>0</td></tr>
+<tr><td>Mismatch positions</td><td>-</td></tr>
+<tr><td>Ambiguous positions</td><td>-</td></tr>
+<tr><td>PAM compatible</td><td>yes</td></tr>
+<tr><td>Experimental score</td><td>100.0000</td></tr>
+<tr><td>Score breakdown</td><td><code>mismatches=0, mismatch_penalty=0.0, seed_mismatches=0, seed_penalty=0.0, pam_compatible=True, pam_penalty=0.0, ambiguous_positions=[], ambiguity_penalty=0.0, raw_score=100.0</code></td></tr>
+</table>
+<div class='alignment'><div class='aln-row'><span class='lbl'>guide   </span><code><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span></code></div><div class='aln-row'><span class='lbl'>candidate</span><code><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span></code></div><div class='aln-row marker'><code>                    </code></div><div class='aln-row'><span class='lbl'>PAM      </span><code>ACG</code> <span class='note-small'>(candidate strand; plus-strand footprint CGT)</span></div></div>
+</details>
+<details class="cand">
+<summary>#38 chr_demo1:76-96 +
+ score=100.0 type=exact</summary>
+<table class="meta">
+<tr><td>Guide (5'→3')</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Matched sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Plus-strand genomic sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>PAM (candidate strand)</td><td><code>ACG</code></td></tr>
+<tr><td>PAM plus-strand footprint</td><td><code>ACG</code></td></tr>
+<tr><td>Coordinates</td><td>76..96 (0-based half-open); PAM 96..99</td></tr>
+<tr><td>Strand</td><td>+</td></tr>
+<tr><td>Mismatch count</td><td>0</td></tr>
+<tr><td>Mismatch positions</td><td>-</td></tr>
+<tr><td>Ambiguous positions</td><td>-</td></tr>
+<tr><td>PAM compatible</td><td>yes</td></tr>
+<tr><td>Experimental score</td><td>100.0000</td></tr>
+<tr><td>Score breakdown</td><td><code>mismatches=0, mismatch_penalty=0.0, seed_mismatches=0, seed_penalty=0.0, pam_compatible=True, pam_penalty=0.0, ambiguous_positions=[], ambiguity_penalty=0.0, raw_score=100.0</code></td></tr>
+</table>
+<div class='alignment'><div class='aln-row'><span class='lbl'>guide   </span><code><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span></code></div><div class='aln-row'><span class='lbl'>candidate</span><code><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span></code></div><div class='aln-row marker'><code>                    </code></div><div class='aln-row'><span class='lbl'>PAM      </span><code>ACG</code> <span class='note-small'>(candidate strand; plus-strand footprint ACG)</span></div></div>
+</details>
+<details class="cand">
+<summary>#39 chr_demo1:76-96 -
+ score=100.0 type=exact</summary>
+<table class="meta">
+<tr><td>Guide (5'→3')</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Matched sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Plus-strand genomic sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>PAM (candidate strand)</td><td><code>ACG</code></td></tr>
+<tr><td>PAM plus-strand footprint</td><td><code>CGT</code></td></tr>
+<tr><td>Coordinates</td><td>76..96 (0-based half-open); PAM 73..76</td></tr>
+<tr><td>Strand</td><td>-</td></tr>
+<tr><td>Mismatch count</td><td>0</td></tr>
+<tr><td>Mismatch positions</td><td>-</td></tr>
+<tr><td>Ambiguous positions</td><td>-</td></tr>
+<tr><td>PAM compatible</td><td>yes</td></tr>
+<tr><td>Experimental score</td><td>100.0000</td></tr>
+<tr><td>Score breakdown</td><td><code>mismatches=0, mismatch_penalty=0.0, seed_mismatches=0, seed_penalty=0.0, pam_compatible=True, pam_penalty=0.0, ambiguous_positions=[], ambiguity_penalty=0.0, raw_score=100.0</code></td></tr>
+</table>
+<div class='alignment'><div class='aln-row'><span class='lbl'>guide   </span><code><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span></code></div><div class='aln-row'><span class='lbl'>candidate</span><code><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span></code></div><div class='aln-row marker'><code>                    </code></div><div class='aln-row'><span class='lbl'>PAM      </span><code>ACG</code> <span class='note-small'>(candidate strand; plus-strand footprint CGT)</span></div></div>
+</details>
+<details class="cand">
+<summary>#40 chr_demo1:80-100 +
+ score=100.0 type=exact</summary>
+<table class="meta">
+<tr><td>Guide (5'→3')</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Matched sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Plus-strand genomic sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>PAM (candidate strand)</td><td><code>ACG</code></td></tr>
+<tr><td>PAM plus-strand footprint</td><td><code>ACG</code></td></tr>
+<tr><td>Coordinates</td><td>80..100 (0-based half-open); PAM 100..103</td></tr>
+<tr><td>Strand</td><td>+</td></tr>
+<tr><td>Mismatch count</td><td>0</td></tr>
+<tr><td>Mismatch positions</td><td>-</td></tr>
+<tr><td>Ambiguous positions</td><td>-</td></tr>
+<tr><td>PAM compatible</td><td>yes</td></tr>
+<tr><td>Experimental score</td><td>100.0000</td></tr>
+<tr><td>Score breakdown</td><td><code>mismatches=0, mismatch_penalty=0.0, seed_mismatches=0, seed_penalty=0.0, pam_compatible=True, pam_penalty=0.0, ambiguous_positions=[], ambiguity_penalty=0.0, raw_score=100.0</code></td></tr>
+</table>
+<div class='alignment'><div class='aln-row'><span class='lbl'>guide   </span><code><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span></code></div><div class='aln-row'><span class='lbl'>candidate</span><code><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span></code></div><div class='aln-row marker'><code>                    </code></div><div class='aln-row'><span class='lbl'>PAM      </span><code>ACG</code> <span class='note-small'>(candidate strand; plus-strand footprint ACG)</span></div></div>
+</details>
+<details class="cand">
+<summary>#41 chr_demo1:80-100 -
+ score=100.0 type=exact</summary>
+<table class="meta">
+<tr><td>Guide (5'→3')</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Matched sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Plus-strand genomic sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>PAM (candidate strand)</td><td><code>ACG</code></td></tr>
+<tr><td>PAM plus-strand footprint</td><td><code>CGT</code></td></tr>
+<tr><td>Coordinates</td><td>80..100 (0-based half-open); PAM 77..80</td></tr>
+<tr><td>Strand</td><td>-</td></tr>
+<tr><td>Mismatch count</td><td>0</td></tr>
+<tr><td>Mismatch positions</td><td>-</td></tr>
+<tr><td>Ambiguous positions</td><td>-</td></tr>
+<tr><td>PAM compatible</td><td>yes</td></tr>
+<tr><td>Experimental score</td><td>100.0000</td></tr>
+<tr><td>Score breakdown</td><td><code>mismatches=0, mismatch_penalty=0.0, seed_mismatches=0, seed_penalty=0.0, pam_compatible=True, pam_penalty=0.0, ambiguous_positions=[], ambiguity_penalty=0.0, raw_score=100.0</code></td></tr>
+</table>
+<div class='alignment'><div class='aln-row'><span class='lbl'>guide   </span><code><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span></code></div><div class='aln-row'><span class='lbl'>candidate</span><code><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span></code></div><div class='aln-row marker'><code>                    </code></div><div class='aln-row'><span class='lbl'>PAM      </span><code>ACG</code> <span class='note-small'>(candidate strand; plus-strand footprint CGT)</span></div></div>
+</details>
+<details class="cand">
+<summary>#42 chr_demo1:84-104 +
+ score=100.0 type=exact</summary>
+<table class="meta">
+<tr><td>Guide (5'→3')</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Matched sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Plus-strand genomic sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>PAM (candidate strand)</td><td><code>ACG</code></td></tr>
+<tr><td>PAM plus-strand footprint</td><td><code>ACG</code></td></tr>
+<tr><td>Coordinates</td><td>84..104 (0-based half-open); PAM 104..107</td></tr>
+<tr><td>Strand</td><td>+</td></tr>
+<tr><td>Mismatch count</td><td>0</td></tr>
+<tr><td>Mismatch positions</td><td>-</td></tr>
+<tr><td>Ambiguous positions</td><td>-</td></tr>
+<tr><td>PAM compatible</td><td>yes</td></tr>
+<tr><td>Experimental score</td><td>100.0000</td></tr>
+<tr><td>Score breakdown</td><td><code>mismatches=0, mismatch_penalty=0.0, seed_mismatches=0, seed_penalty=0.0, pam_compatible=True, pam_penalty=0.0, ambiguous_positions=[], ambiguity_penalty=0.0, raw_score=100.0</code></td></tr>
+</table>
+<div class='alignment'><div class='aln-row'><span class='lbl'>guide   </span><code><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span></code></div><div class='aln-row'><span class='lbl'>candidate</span><code><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span></code></div><div class='aln-row marker'><code>                    </code></div><div class='aln-row'><span class='lbl'>PAM      </span><code>ACG</code> <span class='note-small'>(candidate strand; plus-strand footprint ACG)</span></div></div>
+</details>
+<details class="cand">
+<summary>#43 chr_demo1:84-104 -
+ score=100.0 type=exact</summary>
+<table class="meta">
+<tr><td>Guide (5'→3')</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Matched sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Plus-strand genomic sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>PAM (candidate strand)</td><td><code>ACG</code></td></tr>
+<tr><td>PAM plus-strand footprint</td><td><code>CGT</code></td></tr>
+<tr><td>Coordinates</td><td>84..104 (0-based half-open); PAM 81..84</td></tr>
+<tr><td>Strand</td><td>-</td></tr>
+<tr><td>Mismatch count</td><td>0</td></tr>
+<tr><td>Mismatch positions</td><td>-</td></tr>
+<tr><td>Ambiguous positions</td><td>-</td></tr>
+<tr><td>PAM compatible</td><td>yes</td></tr>
+<tr><td>Experimental score</td><td>100.0000</td></tr>
+<tr><td>Score breakdown</td><td><code>mismatches=0, mismatch_penalty=0.0, seed_mismatches=0, seed_penalty=0.0, pam_compatible=True, pam_penalty=0.0, ambiguous_positions=[], ambiguity_penalty=0.0, raw_score=100.0</code></td></tr>
+</table>
+<div class='alignment'><div class='aln-row'><span class='lbl'>guide   </span><code><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span></code></div><div class='aln-row'><span class='lbl'>candidate</span><code><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span></code></div><div class='aln-row marker'><code>                    </code></div><div class='aln-row'><span class='lbl'>PAM      </span><code>ACG</code> <span class='note-small'>(candidate strand; plus-strand footprint CGT)</span></div></div>
+</details>
+<details class="cand">
+<summary>#44 chr_demo1:88-108 +
+ score=100.0 type=exact</summary>
+<table class="meta">
+<tr><td>Guide (5'→3')</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Matched sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Plus-strand genomic sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>PAM (candidate strand)</td><td><code>ACG</code></td></tr>
+<tr><td>PAM plus-strand footprint</td><td><code>ACG</code></td></tr>
+<tr><td>Coordinates</td><td>88..108 (0-based half-open); PAM 108..111</td></tr>
+<tr><td>Strand</td><td>+</td></tr>
+<tr><td>Mismatch count</td><td>0</td></tr>
+<tr><td>Mismatch positions</td><td>-</td></tr>
+<tr><td>Ambiguous positions</td><td>-</td></tr>
+<tr><td>PAM compatible</td><td>yes</td></tr>
+<tr><td>Experimental score</td><td>100.0000</td></tr>
+<tr><td>Score breakdown</td><td><code>mismatches=0, mismatch_penalty=0.0, seed_mismatches=0, seed_penalty=0.0, pam_compatible=True, pam_penalty=0.0, ambiguous_positions=[], ambiguity_penalty=0.0, raw_score=100.0</code></td></tr>
+</table>
+<div class='alignment'><div class='aln-row'><span class='lbl'>guide   </span><code><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span></code></div><div class='aln-row'><span class='lbl'>candidate</span><code><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span></code></div><div class='aln-row marker'><code>                    </code></div><div class='aln-row'><span class='lbl'>PAM      </span><code>ACG</code> <span class='note-small'>(candidate strand; plus-strand footprint ACG)</span></div></div>
+</details>
+<details class="cand">
+<summary>#45 chr_demo1:88-108 -
+ score=100.0 type=exact</summary>
+<table class="meta">
+<tr><td>Guide (5'→3')</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Matched sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Plus-strand genomic sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>PAM (candidate strand)</td><td><code>ACG</code></td></tr>
+<tr><td>PAM plus-strand footprint</td><td><code>CGT</code></td></tr>
+<tr><td>Coordinates</td><td>88..108 (0-based half-open); PAM 85..88</td></tr>
+<tr><td>Strand</td><td>-</td></tr>
+<tr><td>Mismatch count</td><td>0</td></tr>
+<tr><td>Mismatch positions</td><td>-</td></tr>
+<tr><td>Ambiguous positions</td><td>-</td></tr>
+<tr><td>PAM compatible</td><td>yes</td></tr>
+<tr><td>Experimental score</td><td>100.0000</td></tr>
+<tr><td>Score breakdown</td><td><code>mismatches=0, mismatch_penalty=0.0, seed_mismatches=0, seed_penalty=0.0, pam_compatible=True, pam_penalty=0.0, ambiguous_positions=[], ambiguity_penalty=0.0, raw_score=100.0</code></td></tr>
+</table>
+<div class='alignment'><div class='aln-row'><span class='lbl'>guide   </span><code><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span></code></div><div class='aln-row'><span class='lbl'>candidate</span><code><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span></code></div><div class='aln-row marker'><code>                    </code></div><div class='aln-row'><span class='lbl'>PAM      </span><code>ACG</code> <span class='note-small'>(candidate strand; plus-strand footprint CGT)</span></div></div>
+</details>
+<details class="cand">
+<summary>#46 chr_demo1:92-112 +
+ score=100.0 type=exact</summary>
+<table class="meta">
+<tr><td>Guide (5'→3')</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Matched sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Plus-strand genomic sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>PAM (candidate strand)</td><td><code>ACG</code></td></tr>
+<tr><td>PAM plus-strand footprint</td><td><code>ACG</code></td></tr>
+<tr><td>Coordinates</td><td>92..112 (0-based half-open); PAM 112..115</td></tr>
+<tr><td>Strand</td><td>+</td></tr>
+<tr><td>Mismatch count</td><td>0</td></tr>
+<tr><td>Mismatch positions</td><td>-</td></tr>
+<tr><td>Ambiguous positions</td><td>-</td></tr>
+<tr><td>PAM compatible</td><td>yes</td></tr>
+<tr><td>Experimental score</td><td>100.0000</td></tr>
+<tr><td>Score breakdown</td><td><code>mismatches=0, mismatch_penalty=0.0, seed_mismatches=0, seed_penalty=0.0, pam_compatible=True, pam_penalty=0.0, ambiguous_positions=[], ambiguity_penalty=0.0, raw_score=100.0</code></td></tr>
+</table>
+<div class='alignment'><div class='aln-row'><span class='lbl'>guide   </span><code><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span></code></div><div class='aln-row'><span class='lbl'>candidate</span><code><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span></code></div><div class='aln-row marker'><code>                    </code></div><div class='aln-row'><span class='lbl'>PAM      </span><code>ACG</code> <span class='note-small'>(candidate strand; plus-strand footprint ACG)</span></div></div>
+</details>
+<details class="cand">
+<summary>#47 chr_demo1:92-112 -
+ score=100.0 type=exact</summary>
+<table class="meta">
+<tr><td>Guide (5'→3')</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Matched sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Plus-strand genomic sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>PAM (candidate strand)</td><td><code>ACG</code></td></tr>
+<tr><td>PAM plus-strand footprint</td><td><code>CGT</code></td></tr>
+<tr><td>Coordinates</td><td>92..112 (0-based half-open); PAM 89..92</td></tr>
+<tr><td>Strand</td><td>-</td></tr>
+<tr><td>Mismatch count</td><td>0</td></tr>
+<tr><td>Mismatch positions</td><td>-</td></tr>
+<tr><td>Ambiguous positions</td><td>-</td></tr>
+<tr><td>PAM compatible</td><td>yes</td></tr>
+<tr><td>Experimental score</td><td>100.0000</td></tr>
+<tr><td>Score breakdown</td><td><code>mismatches=0, mismatch_penalty=0.0, seed_mismatches=0, seed_penalty=0.0, pam_compatible=True, pam_penalty=0.0, ambiguous_positions=[], ambiguity_penalty=0.0, raw_score=100.0</code></td></tr>
+</table>
+<div class='alignment'><div class='aln-row'><span class='lbl'>guide   </span><code><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span></code></div><div class='aln-row'><span class='lbl'>candidate</span><code><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span></code></div><div class='aln-row marker'><code>                    </code></div><div class='aln-row'><span class='lbl'>PAM      </span><code>ACG</code> <span class='note-small'>(candidate strand; plus-strand footprint CGT)</span></div></div>
+</details>
+<details class="cand">
+<summary>#48 chr_demo1:96-116 +
+ score=100.0 type=exact</summary>
+<table class="meta">
+<tr><td>Guide (5'→3')</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Matched sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Plus-strand genomic sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>PAM (candidate strand)</td><td><code>ACG</code></td></tr>
+<tr><td>PAM plus-strand footprint</td><td><code>ACG</code></td></tr>
+<tr><td>Coordinates</td><td>96..116 (0-based half-open); PAM 116..119</td></tr>
+<tr><td>Strand</td><td>+</td></tr>
+<tr><td>Mismatch count</td><td>0</td></tr>
+<tr><td>Mismatch positions</td><td>-</td></tr>
+<tr><td>Ambiguous positions</td><td>-</td></tr>
+<tr><td>PAM compatible</td><td>yes</td></tr>
+<tr><td>Experimental score</td><td>100.0000</td></tr>
+<tr><td>Score breakdown</td><td><code>mismatches=0, mismatch_penalty=0.0, seed_mismatches=0, seed_penalty=0.0, pam_compatible=True, pam_penalty=0.0, ambiguous_positions=[], ambiguity_penalty=0.0, raw_score=100.0</code></td></tr>
+</table>
+<div class='alignment'><div class='aln-row'><span class='lbl'>guide   </span><code><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span></code></div><div class='aln-row'><span class='lbl'>candidate</span><code><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span></code></div><div class='aln-row marker'><code>                    </code></div><div class='aln-row'><span class='lbl'>PAM      </span><code>ACG</code> <span class='note-small'>(candidate strand; plus-strand footprint ACG)</span></div></div>
+</details>
+<details class="cand">
+<summary>#49 chr_demo1:96-116 -
+ score=100.0 type=exact</summary>
+<table class="meta">
+<tr><td>Guide (5'→3')</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Matched sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Plus-strand genomic sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>PAM (candidate strand)</td><td><code>ACG</code></td></tr>
+<tr><td>PAM plus-strand footprint</td><td><code>CGT</code></td></tr>
+<tr><td>Coordinates</td><td>96..116 (0-based half-open); PAM 93..96</td></tr>
+<tr><td>Strand</td><td>-</td></tr>
+<tr><td>Mismatch count</td><td>0</td></tr>
+<tr><td>Mismatch positions</td><td>-</td></tr>
+<tr><td>Ambiguous positions</td><td>-</td></tr>
+<tr><td>PAM compatible</td><td>yes</td></tr>
+<tr><td>Experimental score</td><td>100.0000</td></tr>
+<tr><td>Score breakdown</td><td><code>mismatches=0, mismatch_penalty=0.0, seed_mismatches=0, seed_penalty=0.0, pam_compatible=True, pam_penalty=0.0, ambiguous_positions=[], ambiguity_penalty=0.0, raw_score=100.0</code></td></tr>
+</table>
+<div class='alignment'><div class='aln-row'><span class='lbl'>guide   </span><code><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span></code></div><div class='aln-row'><span class='lbl'>candidate</span><code><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span></code></div><div class='aln-row marker'><code>                    </code></div><div class='aln-row'><span class='lbl'>PAM      </span><code>ACG</code> <span class='note-small'>(candidate strand; plus-strand footprint CGT)</span></div></div>
+</details>
+<details class="cand">
+<summary>#50 chr_demo1:100-120 +
+ score=100.0 type=exact</summary>
+<table class="meta">
+<tr><td>Guide (5'→3')</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Matched sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Plus-strand genomic sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>PAM (candidate strand)</td><td><code>ACG</code></td></tr>
+<tr><td>PAM plus-strand footprint</td><td><code>ACG</code></td></tr>
+<tr><td>Coordinates</td><td>100..120 (0-based half-open); PAM 120..123</td></tr>
+<tr><td>Strand</td><td>+</td></tr>
+<tr><td>Mismatch count</td><td>0</td></tr>
+<tr><td>Mismatch positions</td><td>-</td></tr>
+<tr><td>Ambiguous positions</td><td>-</td></tr>
+<tr><td>PAM compatible</td><td>yes</td></tr>
+<tr><td>Experimental score</td><td>100.0000</td></tr>
+<tr><td>Score breakdown</td><td><code>mismatches=0, mismatch_penalty=0.0, seed_mismatches=0, seed_penalty=0.0, pam_compatible=True, pam_penalty=0.0, ambiguous_positions=[], ambiguity_penalty=0.0, raw_score=100.0</code></td></tr>
+</table>
+<div class='alignment'><div class='aln-row'><span class='lbl'>guide   </span><code><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span></code></div><div class='aln-row'><span class='lbl'>candidate</span><code><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span></code></div><div class='aln-row marker'><code>                    </code></div><div class='aln-row'><span class='lbl'>PAM      </span><code>ACG</code> <span class='note-small'>(candidate strand; plus-strand footprint ACG)</span></div></div>
+</details>
+<details class="cand">
+<summary>#51 chr_demo1:100-120 -
+ score=100.0 type=exact</summary>
+<table class="meta">
+<tr><td>Guide (5'→3')</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Matched sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Plus-strand genomic sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>PAM (candidate strand)</td><td><code>ACG</code></td></tr>
+<tr><td>PAM plus-strand footprint</td><td><code>CGT</code></td></tr>
+<tr><td>Coordinates</td><td>100..120 (0-based half-open); PAM 97..100</td></tr>
+<tr><td>Strand</td><td>-</td></tr>
+<tr><td>Mismatch count</td><td>0</td></tr>
+<tr><td>Mismatch positions</td><td>-</td></tr>
+<tr><td>Ambiguous positions</td><td>-</td></tr>
+<tr><td>PAM compatible</td><td>yes</td></tr>
+<tr><td>Experimental score</td><td>100.0000</td></tr>
+<tr><td>Score breakdown</td><td><code>mismatches=0, mismatch_penalty=0.0, seed_mismatches=0, seed_penalty=0.0, pam_compatible=True, pam_penalty=0.0, ambiguous_positions=[], ambiguity_penalty=0.0, raw_score=100.0</code></td></tr>
+</table>
+<div class='alignment'><div class='aln-row'><span class='lbl'>guide   </span><code><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span></code></div><div class='aln-row'><span class='lbl'>candidate</span><code><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span></code></div><div class='aln-row marker'><code>                    </code></div><div class='aln-row'><span class='lbl'>PAM      </span><code>ACG</code> <span class='note-small'>(candidate strand; plus-strand footprint CGT)</span></div></div>
+</details>
+<details class="cand">
+<summary>#52 chr_demo1:104-124 +
+ score=100.0 type=exact</summary>
+<table class="meta">
+<tr><td>Guide (5'→3')</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Matched sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Plus-strand genomic sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>PAM (candidate strand)</td><td><code>ACG</code></td></tr>
+<tr><td>PAM plus-strand footprint</td><td><code>ACG</code></td></tr>
+<tr><td>Coordinates</td><td>104..124 (0-based half-open); PAM 124..127</td></tr>
+<tr><td>Strand</td><td>+</td></tr>
+<tr><td>Mismatch count</td><td>0</td></tr>
+<tr><td>Mismatch positions</td><td>-</td></tr>
+<tr><td>Ambiguous positions</td><td>-</td></tr>
+<tr><td>PAM compatible</td><td>yes</td></tr>
+<tr><td>Experimental score</td><td>100.0000</td></tr>
+<tr><td>Score breakdown</td><td><code>mismatches=0, mismatch_penalty=0.0, seed_mismatches=0, seed_penalty=0.0, pam_compatible=True, pam_penalty=0.0, ambiguous_positions=[], ambiguity_penalty=0.0, raw_score=100.0</code></td></tr>
+</table>
+<div class='alignment'><div class='aln-row'><span class='lbl'>guide   </span><code><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span></code></div><div class='aln-row'><span class='lbl'>candidate</span><code><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span></code></div><div class='aln-row marker'><code>                    </code></div><div class='aln-row'><span class='lbl'>PAM      </span><code>ACG</code> <span class='note-small'>(candidate strand; plus-strand footprint ACG)</span></div></div>
+</details>
+<details class="cand">
+<summary>#53 chr_demo1:104-124 -
+ score=100.0 type=exact</summary>
+<table class="meta">
+<tr><td>Guide (5'→3')</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Matched sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Plus-strand genomic sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>PAM (candidate strand)</td><td><code>ACG</code></td></tr>
+<tr><td>PAM plus-strand footprint</td><td><code>CGT</code></td></tr>
+<tr><td>Coordinates</td><td>104..124 (0-based half-open); PAM 101..104</td></tr>
+<tr><td>Strand</td><td>-</td></tr>
+<tr><td>Mismatch count</td><td>0</td></tr>
+<tr><td>Mismatch positions</td><td>-</td></tr>
+<tr><td>Ambiguous positions</td><td>-</td></tr>
+<tr><td>PAM compatible</td><td>yes</td></tr>
+<tr><td>Experimental score</td><td>100.0000</td></tr>
+<tr><td>Score breakdown</td><td><code>mismatches=0, mismatch_penalty=0.0, seed_mismatches=0, seed_penalty=0.0, pam_compatible=True, pam_penalty=0.0, ambiguous_positions=[], ambiguity_penalty=0.0, raw_score=100.0</code></td></tr>
+</table>
+<div class='alignment'><div class='aln-row'><span class='lbl'>guide   </span><code><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span></code></div><div class='aln-row'><span class='lbl'>candidate</span><code><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span></code></div><div class='aln-row marker'><code>                    </code></div><div class='aln-row'><span class='lbl'>PAM      </span><code>ACG</code> <span class='note-small'>(candidate strand; plus-strand footprint CGT)</span></div></div>
+</details>
+<details class="cand">
+<summary>#54 chr_demo1:108-128 -
+ score=100.0 type=exact</summary>
+<table class="meta">
+<tr><td>Guide (5'→3')</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Matched sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>Plus-strand genomic sequence</td><td><code>ACGTACGTACGTACGTACGT</code></td></tr>
+<tr><td>PAM (candidate strand)</td><td><code>ACG</code></td></tr>
+<tr><td>PAM plus-strand footprint</td><td><code>CGT</code></td></tr>
+<tr><td>Coordinates</td><td>108..128 (0-based half-open); PAM 105..108</td></tr>
+<tr><td>Strand</td><td>-</td></tr>
+<tr><td>Mismatch count</td><td>0</td></tr>
+<tr><td>Mismatch positions</td><td>-</td></tr>
+<tr><td>Ambiguous positions</td><td>-</td></tr>
+<tr><td>PAM compatible</td><td>yes</td></tr>
+<tr><td>Experimental score</td><td>100.0000</td></tr>
+<tr><td>Score breakdown</td><td><code>mismatches=0, mismatch_penalty=0.0, seed_mismatches=0, seed_penalty=0.0, pam_compatible=True, pam_penalty=0.0, ambiguous_positions=[], ambiguity_penalty=0.0, raw_score=100.0</code></td></tr>
+</table>
+<div class='alignment'><div class='aln-row'><span class='lbl'>guide   </span><code><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span><span class="base">A</span><span class="base">C</span><span class="base">G</span><span class="base">T</span></code></div><div class='aln-row'><span class='lbl'>candidate</span><code><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span><span class="base match">A</span><span class="base match">C</span><span class="base match">G</span><span class="base match">T</span></code></div><div class='aln-row marker'><code>                    </code></div><div class='aln-row'><span class='lbl'>PAM      </span><code>ACG</code> <span class='note-small'>(candidate strand; plus-strand footprint CGT)</span></div></div>
+</details>
+
+<p><small>Generated by GeneWeaver. Coordinates are 0-based half-open
+[start, end) on the plus strand of each FASTA record; PAM coordinates are
+the plus-strand footprint. Score model: geneware-heuristic-v1
+(experimental, not a validated biological prediction).</small></p>
+</body></html>

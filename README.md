@@ -254,10 +254,25 @@ python -m pip install -r requirements.txt
 
 ## Usage
 
-### Terminal dashboard
+### Browser dashboard (default)
 
 ```bat
 python -m geneware
+```
+
+Launches the Streamlit web app (`geneware/webapp.py`) in your browser
+at `http://localhost:8501`. Sections: Home Dashboard, Genome Upload,
+CRISPR Analysis, Analysis Results, Performance, Reports. Upload your
+own `.fasta`/`.fa` or load the bundled example, enter a guide + PAM +
+mismatch tolerance, run the real CPU/Dask/GPU backend, browse ranked
+candidates with search/filters, view measured timings, and download
+CSV/JSON/HTML reports. GPU is only offered when `detect_gpu()` genuinely
+reports it available.
+
+### Terminal dashboard (optional)
+
+```bat
+python -m geneware --textual
 ```
 
 Workflow: **Genome Files** → Load Genome (or Load Example) →

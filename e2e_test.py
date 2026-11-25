@@ -47,10 +47,15 @@ def main():
 
         # --- Upload own FASTA ---
         page.locator("input[type='file']").set_input_files(str(UPLOAD))
-        page.wait_for_timeout(4000)
+        try:
+            page.wait_for_selector("text=Loaded", timeout=20000)
+        except Exception:
+            pass
+        page.wait_for_timeout(2000)
         content = page.content()
         check("own FASTA parses + stats", "test_upload.fasta" in content
-              and "Loaded" in content)
+              and "Loaded" in content,
+              page.locator("[data-testid='stMain']").inner_text()[:200])
         shot(page, "03_upload_own")
 
         # --- CRISPR Analysis ---

@@ -13,7 +13,10 @@ attaching to a stale process; pass ``--port <N>`` to use another port.
 import socket
 import subprocess
 import sys
+import threading
+import time
 import urllib.request
+import webbrowser
 from pathlib import Path
 
 _WEBAPP = Path(__file__).resolve().parent / "webapp.py"
@@ -38,18 +41,43 @@ def _is_streamlit_app(port: int) -> bool:
         return False
 
 
+def _open_browser_when_ready(url: str, port: int,
+                             timeout: float = 30.0) -> None:
+    """Wait for Streamlit's health endpoint, then open the URL.
+
+    Runs in a daemon thread so it never blocks shutdown. If the server
+    never becomes healthy the browser is simply not opened.
+    """
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            with urllib.request.urlopen(
+                f"http://127.0.0.1:{port}/healthz", timeout=1
+            ) as resp:
+                if resp.status == 200:
+                    break
+        except Exception:
+            time.sleep(0.4)
+    else:
+        return
+    try:
+        webbrowser.open(url)
+    except Exception:
+        pass
+
+
 def _launch_webapp(port: int) -> int:
     url = f"http://localhost:{port}"
     if _port_in_use(port):
         if _is_streamlit_app(port):
             print(
                 f"Port {port} is already serving a Streamlit app at {url}.\n"
-                "Open that URL in your browser, or stop the existing "
-                "process and run this command again.\n"
-                f"To start a fresh instance on another port use: "
-                f"python -m geneware --port {port + 1}",
+                "Opening it in your browser. To start a fresh GeneWeaver "
+                "instance instead, stop the existing process first, or "
+                f"use: python -m geneware --port {port + 1}",
                 file=sys.stderr,
             )
+            webbrowser.open(url)
         else:
             print(
                 f"Port {port} is already in use by another process, so "
@@ -67,7 +95,11 @@ def _launch_webapp(port: int) -> int:
         "--browser.gatherUsageStats", "false",
     ]
     print(f"Starting GeneWeaver browser app at {url} …", flush=True)
-    print("Press Ctrl+C to stop.", flush=True)
+    print("The app will open in your browser automatically. "
+          "Press Ctrl+C to stop.", flush=True)
+    threading.Thread(
+        target=_open_browser_when_ready, args=(url, port), daemon=True
+    ).start()
     return subprocess.call(cmd)
 
 

@@ -18,6 +18,7 @@ from __future__ import annotations
 import csv
 import html
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -36,6 +37,7 @@ CSV_FIELDS = [
     "chromosome", "start", "end", "pam_start", "pam_end", "strand",
     "mismatches", "mismatch_positions", "ambiguous_positions",
     "pam", "pam_compatible", "matched_sequence", "genomic_sequence",
+    "analysis_date",
 ]
 
 
@@ -98,6 +100,8 @@ def _csv_metadata(analysis: "AnalysisResult") -> dict[str, object]:
             analysis, "total_seconds", analysis.elapsed_seconds
         ),
         "score_model": "geneware-heuristic-v1 (experimental, not validated)",
+        "analysis_date": datetime.now(timezone.utc).isoformat(
+            timespec="seconds"),
     }
 
 
@@ -143,6 +147,8 @@ def write_json(analysis: "AnalysisResult", path: str | Path) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = analysis.analysis_dict()
     payload["processing_method"] = _processing_method(analysis)
+    payload["analysis_date"] = datetime.now(timezone.utc).isoformat(
+        timespec="seconds")
     payload["sequences_processed"] = _sequences_processed(analysis)
     payload["candidate_count"] = _candidate_count(analysis)
     payload["matches_found"] = _matches_found(analysis)
@@ -321,6 +327,7 @@ will occur.</p>
 <tr><td>Sequences processed</td><td>{_sequences_processed(a):,}</td></tr>
 <tr><td>Candidate matches exported</td><td>{len(a.scored):,}</td></tr>
 <tr><td>Matches found before export</td><td>{_matches_found(a):,}</td></tr>
+<tr><td>Report generated</td><td>{datetime.now(timezone.utc):%Y-%m-%d %H:%M UTC}</td></tr>
 </table>
 
 <h2>Score model</h2>
@@ -425,6 +432,8 @@ def write_pdf(analysis: "AnalysisResult", path: str | Path) -> Path:
         ["Sequences processed", f"{_sequences_processed(analysis):,}"],
         ["Candidate matches", f"{len(analysis.scored):,}"],
         ["Matches found", f"{_matches_found(analysis):,}"],
+        ["Report generated (UTC)",
+         f"{datetime.now(timezone.utc):%Y-%m-%d %H:%M:%S}"],
     ]
     meta_table = Table([[P(k), P(v)] for k, v in meta], colWidths=[130, 340])
     meta_table.setStyle(TableStyle([

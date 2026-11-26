@@ -261,13 +261,15 @@ python -m geneware
 ```
 
 Launches the Streamlit web app (`geneware/webapp.py`) in your browser
-at `http://localhost:8501`. Sections: Home Dashboard, Genome Upload,
-CRISPR Analysis, Analysis Results, Performance, Reports. Upload your
-own `.fasta`/`.fa` or load the bundled example, enter a guide + PAM +
+at `http://localhost:8501`. Sections: Home, Upload Genome, Run
+Analysis, Results, Performance, Reports. Upload your own
+`.fasta`/`.fa`/`.fna` or load the bundled example, enter a guide + PAM +
 mismatch tolerance, run the real CPU/Dask/GPU backend, browse ranked
-candidates with search/filters, view measured timings, and download
-CSV/JSON/HTML reports. GPU is only offered when `detect_gpu()` genuinely
-reports it available.
+candidates with search/filters and a highlighted alignment view, view
+measured timings, and download CSV/JSON/HTML/PDF reports. GPU is only
+offered when `detect_gpu()` genuinely reports it available; detailed
+hardware/backend diagnostics live under **System Details** on the
+Performance page.
 
 ### Terminal dashboard (optional)
 
